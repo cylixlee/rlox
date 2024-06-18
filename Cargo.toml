@@ -1,0 +1,10 @@
+[workspace]
+members = ["crates/rlox-analyzer"]
+
+[package]
+name = "rlox"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rlox-analyzer = { path = "crates/rlox-analyzer" }
