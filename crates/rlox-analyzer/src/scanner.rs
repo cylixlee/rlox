@@ -1,7 +1,10 @@
 use std::num::ParseFloatError;
 use std::ops::Range;
 
+use codespan_reporting::diagnostic::Label;
 use logos::{Lexer, Logos};
+
+use crate::{DiagnosableResult, Diagnostic};
 
 #[rustfmt::skip]
 #[derive(Logos, Debug, PartialEq)]
@@ -36,7 +39,7 @@ pub enum Lexeme {
     #[regex("\"[^\"]*\"", scan_string)]
     String(String),
 
-    #[regex("[0-9]+(.[0-9]+)?", scan_number)]
+    #[regex("[0-9]+(\\.[0-9]+)?", scan_number)]
     Number(f64),
 
     // Keywords.
@@ -81,13 +84,29 @@ pub struct Token {
     pub span: Range<usize>,
 }
 
-pub fn scan(source: impl AsRef<str>) -> Result<Vec<Token>, ParseFloatError> {
-    let mut lexer = Lexeme::lexer(source.as_ref());
+pub fn scan(source: impl AsRef<str>) -> DiagnosableResult<Vec<Token>> {
+    let lexer = Lexeme::lexer(source.as_ref());
     let mut tokens = Vec::new();
     for (lexeme, span) in lexer.spanned() {
         let lexeme = match lexeme {
             Ok(lexeme) => lexeme,
-            Err(error) => return Err(error.unwrap()),
+            Err(error) => {
+                return match error {
+                    None => Err(Diagnostic::error()
+                        .with_code("E0001")
+                        .with_message("Unrecognized token")
+                        .with_labels(vec![
+                            Label::primary((), span).with_message("invalid token encountered here")
+                        ])),
+                    Some(error) => Err(Diagnostic::error()
+                        .with_code("E0002")
+                        .with_message("Unparsable float literal")
+                        .with_labels(vec![Label::primary((), span).with_message(
+                            "this float value may be valid, but cannot be parsed as f64",
+                        )])
+                        .with_notes(vec![format!("internal reason: {}", error)])),
+                }
+            }
         };
         tokens.push(Token { lexeme, span })
     }
