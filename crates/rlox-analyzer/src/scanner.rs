@@ -1,13 +1,14 @@
 use std::num::ParseFloatError;
-use std::ops::Range;
 
 use codespan_reporting::diagnostic::Label;
 use logos::{Lexer, Logos};
 
+use rlox_intermediate::Spanned;
+
 use crate::{DiagnosableResult, Diagnostic};
 
 #[rustfmt::skip]
-#[derive(Logos, Debug, PartialEq)]
+#[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(skip r"[ \t\r\n]+")]
 #[logos(error = Option<ParseFloatError>)]
 pub enum Lexeme {
@@ -78,11 +79,7 @@ fn scan_number(lexer: &mut Lexer<Lexeme>) -> Result<f64, ParseFloatError> {
     lexer.slice().parse::<f64>()
 }
 
-#[derive(Debug)]
-pub struct Token {
-    pub lexeme: Lexeme,
-    pub span: Range<usize>,
-}
+pub type Token = Spanned<Lexeme>;
 
 pub fn scan(source: impl AsRef<str>) -> DiagnosableResult<Vec<Token>> {
     let lexer = Lexeme::lexer(source.as_ref());
@@ -108,7 +105,10 @@ pub fn scan(source: impl AsRef<str>) -> DiagnosableResult<Vec<Token>> {
                 }
             }
         };
-        tokens.push(Token { lexeme, span })
+        tokens.push(Token {
+            value: lexeme,
+            span,
+        });
     }
     Ok(tokens)
 }

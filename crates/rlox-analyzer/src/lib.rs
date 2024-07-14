@@ -6,6 +6,7 @@ use codespan_reporting::term;
 use codespan_reporting::term::Config;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
+pub mod parser;
 pub mod scanner;
 
 // Lox language has no multi-source support, so we'll just use
@@ -13,10 +14,9 @@ pub mod scanner;
 //
 // Thus, the [`FileId`] is unit type because there's no need for an id;
 type FileId = ();
-
-// Type aliases is for convenience.
 type Diagnostic = codespan_reporting::diagnostic::Diagnostic<FileId>;
-type DiagnosableResult<T = ()> = Result<T, Diagnostic>;
+
+pub type DiagnosableResult<T = ()> = Result<T, Diagnostic>;
 
 pub struct DiagnosableSource<N, S> {
     writer: StandardStream,
