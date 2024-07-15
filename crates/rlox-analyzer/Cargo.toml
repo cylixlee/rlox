@@ -3,9 +3,6 @@ name = "rlox-analyzer"
 version = "0.1.0"
 edition = "2021"
 
-[profile.release]
-lto = true
-
 [dependencies]
 logos = "0.14.0"
 rlox-intermediate = { path = "../rlox-intermediate" }

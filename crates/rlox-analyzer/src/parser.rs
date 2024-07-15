@@ -3,6 +3,7 @@ use rlox_intermediate::{DiagnosableResult, Expression, raise};
 use crate::scanner::{Lexeme, Token};
 
 mod expression;
+mod statement;
 
 struct Parser {
     tokens: Vec<Token>,
