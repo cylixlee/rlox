@@ -1,10 +1,8 @@
 use std::mem;
 
-use codespan_reporting::diagnostic::Label;
-
 use rlox_intermediate::{BinaryOperator, Expression, Literal, Spanned, UnaryOperator};
 
-use crate::{DiagnosableResult, Diagnostic};
+use crate::{DiagnosableResult, raise};
 use crate::parser::Parser;
 use crate::scanner::{Lexeme, Token};
 
@@ -82,13 +80,7 @@ impl Parser {
             Lexeme::LeftParenthesis => self.parse_parenthesized()?,
             // unary
             Lexeme::Bang | Lexeme::Minus => self.parse_unary()?,
-            _ => {
-                return Err(Diagnostic::error()
-                    .with_code("E0004")
-                    .with_message("Invalid prefix expression")
-                    .with_labels(vec![Label::primary((), span.clone())
-                        .with_message("this token cannot be prefix of an expression")]))
-            }
+            _ => raise!("E0004", span),
         };
 
         while let Some(infix) = self.peek() {

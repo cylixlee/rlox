@@ -1,11 +1,10 @@
 use std::num::ParseFloatError;
 
-use codespan_reporting::diagnostic::Label;
 use logos::{Lexer, Logos};
 
 use rlox_intermediate::Spanned;
 
-use crate::{DiagnosableResult, Diagnostic};
+use crate::{DiagnosableResult, raise};
 
 #[rustfmt::skip]
 #[derive(Logos, Debug, PartialEq, Clone)]
@@ -87,23 +86,10 @@ pub fn scan(source: impl AsRef<str>) -> DiagnosableResult<Vec<Token>> {
     for (lexeme, span) in lexer.spanned() {
         let lexeme = match lexeme {
             Ok(lexeme) => lexeme,
-            Err(error) => {
-                return match error {
-                    None => Err(Diagnostic::error()
-                        .with_code("E0001")
-                        .with_message("Unrecognized token")
-                        .with_labels(vec![
-                            Label::primary((), span).with_message("invalid token encountered here")
-                        ])),
-                    Some(error) => Err(Diagnostic::error()
-                        .with_code("E0002")
-                        .with_message("Unparsable float literal")
-                        .with_labels(vec![Label::primary((), span).with_message(
-                            "this float value may be valid, but cannot be parsed as f64",
-                        )])
-                        .with_notes(vec![format!("internal reason: {}", error)])),
-                }
-            }
+            Err(error) => match error {
+                None => raise!("E0001", span),
+                Some(error) => raise!("E0002", span, format!("internal reason: {}", error)),
+            },
         };
         tokens.push(Token {
             value: lexeme,

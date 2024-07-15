@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 codespan-reporting = "0.11.1"
 logos = "0.14.0"
+phf = { version = "0.11.2", features = ["macros"] }
 rlox-intermediate = { path = "../rlox-intermediate" }

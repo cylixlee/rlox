@@ -44,6 +44,5 @@ pub enum Expression {
         operator: Spanned<UnaryOperator>,
         expression: Box<Expression>,
     },
-    Parenthesized(Spanned<Box<Expression>>),
     Literal(Spanned<Literal>),
 }

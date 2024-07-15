@@ -6,6 +6,7 @@ use codespan_reporting::term;
 use codespan_reporting::term::Config;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
+mod errors;
 pub mod parser;
 pub mod scanner;
 

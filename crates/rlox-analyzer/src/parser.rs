@@ -1,8 +1,6 @@
-use codespan_reporting::diagnostic::Label;
-
 use rlox_intermediate::Expression;
 
-use crate::{DiagnosableResult, Diagnostic};
+use crate::{DiagnosableResult, raise};
 use crate::scanner::{Lexeme, Token};
 
 mod expression;
@@ -28,13 +26,7 @@ impl Parser {
         if self.current < self.tokens.len() {
             return Ok(&self.tokens[self.current]);
         }
-        let span = self.tokens[self.current - 1].span.clone();
-        Err(Diagnostic::error()
-            .with_code("E0003")
-            .with_message("Unexpected EOF")
-            .with_labels(vec![
-                Label::primary((), span).with_message("incomplete code segment here")
-            ]))
+        raise!("E0003", self.tokens[self.current - 1].span.clone())
     }
 
     fn must_advance(&mut self) -> DiagnosableResult<&Token> {
@@ -42,25 +34,18 @@ impl Parser {
             self.current += 1;
             return Ok(&self.tokens[self.current - 1]);
         }
-        let span = self.tokens[self.current - 1].span.clone();
-        Err(Diagnostic::error()
-            .with_code("E0003")
-            .with_message("Unexpected EOF")
-            .with_labels(vec![
-                Label::primary((), span).with_message("incomplete code segment here")
-            ]))
+        raise!("E0003", self.tokens[self.current - 1].span.clone())
     }
 
     fn must_consume(&mut self, lexeme: &Lexeme) -> DiagnosableResult {
         let Token { value, span } = self.must_advance()?;
-        if value != lexeme {
-            return Err(Diagnostic::error()
-                .with_code("E0005")
-                .with_message("Unexpected token")
-                .with_labels(vec![Label::primary((), span.clone())
-                    .with_message(format!("expected {lexeme:?}, found {value:?}"))]));
+        if value == lexeme {
+            return Ok(());
         }
-        Ok(())
+        raise! {
+            "E0005", span.clone(),
+            format!("expected {lexeme:?}, found {value:?}"),
+        }
     }
 }
 
