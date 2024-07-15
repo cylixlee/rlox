@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 codespan-reporting = "0.11.1"
+getset = "0.1.2"
 phf = { version = "0.11.2", features = ["macros"] }

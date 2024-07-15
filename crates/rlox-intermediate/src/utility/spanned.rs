@@ -1,13 +1,15 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut, Range};
 
+pub type Span = Range<usize>;
+
 pub struct Spanned<T> {
     pub value: T,
-    pub span: Range<usize>,
+    pub span: Span,
 }
 
 impl<T> Spanned<T> {
-    pub fn new(value: T, span: impl Into<Range<usize>>) -> Self {
+    pub fn new(value: T, span: impl Into<Span>) -> Self {
         Self {
             value,
             span: span.into(),

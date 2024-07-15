@@ -1,9 +1,7 @@
-use std::ops::Range;
-
 use codespan_reporting::diagnostic::Label;
 use phf::phf_map;
 
-use crate::Diagnostic;
+use crate::{Diagnostic, Span};
 
 struct ErrorInfo {
     message: &'static str,
@@ -33,7 +31,7 @@ static ERROR_TABLE: phf::Map<&'static str, ErrorInfo> = phf_map! {
     },
 };
 
-pub fn raise(error_code: &'static str, span: Range<usize>) -> Diagnostic {
+pub fn raise(error_code: &'static str, span: Span) -> Diagnostic {
     let info = &ERROR_TABLE[error_code];
     Diagnostic::error()
         .with_code(error_code)

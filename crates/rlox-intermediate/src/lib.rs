@@ -1,7 +1,9 @@
 pub use ast::*;
+pub use bytecode::*;
 pub use utility::*;
 
 mod ast;
+mod bytecode;
 pub mod errors;
 mod utility;
 

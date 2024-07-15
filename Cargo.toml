@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/rlox-analyzer", "crates/rlox-intermediate"]
+members = ["crates/rlox-analyzer", "crates/rlox-intermediate", "crates/rlox-runtime"]
 
 [package]
 name = "rlox"
@@ -13,3 +13,4 @@ panic = "abort"
 [dependencies]
 rlox-analyzer = { path = "crates/rlox-analyzer" }
 rlox-intermediate = { path = "crates/rlox-intermediate" }
+rlox-runtime = { path = "crates/rlox-runtime" }
