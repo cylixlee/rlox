@@ -16,4 +16,5 @@ pub enum Declaration {
         name: Spanned<String>,
         initializer: Option<Expression>,
     },
+    Statement(Statement),
 }

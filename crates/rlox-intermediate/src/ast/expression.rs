@@ -7,6 +7,8 @@ pub enum Literal {
     Number(f64),
     String(String),
     Identifier(String),
+    This,
+    Super,
 }
 
 #[derive(Debug)]

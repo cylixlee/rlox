@@ -3,8 +3,8 @@ use crate::Expression;
 
 #[derive(Debug)]
 pub enum ForLoopInitializer {
-    VarDeclaration(Declaration),
-    VarInitialization(Expression),
+    VarDeclaration(Box<Declaration>),
+    VarInitialization(Box<Expression>),
 }
 
 #[derive(Debug)]

@@ -4,6 +4,7 @@
 use std::fmt::Display;
 use std::io;
 
+use rlox_analyzer::{parser, scanner};
 use rlox_intermediate::{DiagnosableResult, DiagnosableSource};
 
 fn main() {
@@ -26,5 +27,8 @@ where
     N: Display + Clone,
     S: AsRef<str>,
 {
+    let tokens = scanner::scan(&**source)?;
+    let declarations = parser::parse(tokens)?;
+    println!("{declarations:#?}");
     Ok(())
 }

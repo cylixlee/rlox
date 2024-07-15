@@ -77,6 +77,8 @@ impl Parser {
             Lexeme::Number(number) => literal!(Number, number),
             Lexeme::String(string) => literal!(String, string),
             Lexeme::Identifier(identifier) => literal!(Identifier, identifier),
+            Lexeme::This => literal!(This),
+            Lexeme::Super => literal!(Super),
             // parenthesized
             Lexeme::LeftParenthesis => self.parse_parenthesized()?,
             // unary
