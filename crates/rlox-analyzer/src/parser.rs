@@ -1,6 +1,5 @@
-use rlox_intermediate::Expression;
+use rlox_intermediate::{DiagnosableResult, Expression, raise};
 
-use crate::{DiagnosableResult, raise};
 use crate::scanner::{Lexeme, Token};
 
 mod expression;

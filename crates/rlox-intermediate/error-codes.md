@@ -5,5 +5,5 @@ errors in an elegant way.
 
 For more detail, see [errors.rs](src/errors.rs)
 
-> **Note**: All error diagnostics are performed in scanning and parsing procedure.
-> Codegen step may fail with no detailed message, and leads to panic at runtime.
+> **Note**: `rlox-analyzer` and other components of `rlox` provide **no** guarantee on
+> programs' correctness. Wrong programs may compile, and lead to panic at runtime.

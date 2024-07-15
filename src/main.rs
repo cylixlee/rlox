@@ -1,7 +1,8 @@
 use std::fmt::Display;
 use std::io;
 
-use rlox_analyzer::{DiagnosableResult, DiagnosableSource, parser, scanner};
+use rlox_analyzer::{parser, scanner};
+use rlox_intermediate::{DiagnosableResult, DiagnosableSource};
 
 fn main() {
     let mut buffer = String::new();
