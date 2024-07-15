@@ -20,8 +20,8 @@ static ERROR_TABLE: phf::Map<&'static str, ErrorInfo> = phf_map! {
         explanation: "this float value may be valid, but cannot be parsed as f64",
     },
     "E0003" => ErrorInfo {
-        message: "Unexpected EOF",
-        explanation: "incomplete code segment here",
+        message: "Early EOF",
+        explanation: "expect some token or Semicolon after this, got EOF",
     },
     "E0004" => ErrorInfo {
         message: "Invalid prefix expression",

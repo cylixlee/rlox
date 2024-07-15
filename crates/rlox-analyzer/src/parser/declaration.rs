@@ -59,7 +59,6 @@ impl Parser {
 
 // Utility rules
 type Parameters = Vec<Spanned<String>>;
-#[allow(dead_code)]
 type Arguments = Vec<Expression>;
 
 // Utility functions
@@ -113,8 +112,7 @@ impl Parser {
     }
 
     // Zero or more expressions separated by comma.
-    #[allow(dead_code)]
-    fn parse_arguments(&mut self) -> DiagnosableResult<Arguments> {
+    pub(super) fn parse_arguments(&mut self) -> DiagnosableResult<Arguments> {
         let mut arguments = Arguments::new();
         if let Ok(expression) = self.parse_expression() {
             arguments.push(expression);

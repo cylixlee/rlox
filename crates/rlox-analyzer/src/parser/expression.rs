@@ -18,6 +18,7 @@ enum InfixPrecedence {
     Relational,     // left associative
     Additive,       // left associative
     Multiplicative, // left associative
+    Invocation,     // left associative
     Property,       // left associative
     Impossible,
 }
@@ -45,6 +46,7 @@ impl Lexeme {
             }
             Lexeme::Plus | Lexeme::Minus => InfixPrecedence::Additive,
             Lexeme::Star | Lexeme::Slash => InfixPrecedence::Multiplicative,
+            Lexeme::LeftParenthesis => InfixPrecedence::Invocation,
             Lexeme::Dot => InfixPrecedence::Property,
             _ => InfixPrecedence::None,
         }
@@ -90,7 +92,10 @@ impl Parser {
             if infix.precedence() < precedence {
                 break;
             }
-            expression = self.parse_binary(expression)?;
+            expression = match &**infix {
+                Lexeme::LeftParenthesis => self.parse_invocation(expression)?,
+                _ => self.parse_binary(expression)?,
+            };
         }
         Ok(expression)
     }
@@ -100,6 +105,16 @@ impl Parser {
         let expression = self.parse_expression()?;
         self.must_consume(&Lexeme::RightParenthesis)?;
         Ok(expression)
+    }
+
+    fn parse_invocation(&mut self, left: Expression) -> DiagnosableResult<Expression> {
+        self.must_consume(&Lexeme::LeftParenthesis)?;
+        let arguments = self.parse_arguments()?;
+        self.must_consume(&Lexeme::RightParenthesis)?;
+        Ok(Expression::Invocation {
+            expression: Box::new(left),
+            arguments,
+        })
     }
 
     fn parse_unary(&mut self) -> DiagnosableResult<Expression> {
@@ -123,7 +138,7 @@ impl Parser {
         #[rustfmt::skip]
         let Token { value: operator, span } = self.must_advance()?.clone();
         let precedence = operator.precedence();
-        let expression = match operator {
+        let right = match operator {
             Lexeme::Equal => self.parse_precedence(precedence),
             _ => self.parse_precedence(precedence.increase()),
         }?;
@@ -147,7 +162,7 @@ impl Parser {
         Ok(Expression::Binary {
             left: Box::new(left),
             operator: Spanned::new(operator, span.clone()),
-            right: Box::new(expression),
+            right: Box::new(right),
         })
     }
 }

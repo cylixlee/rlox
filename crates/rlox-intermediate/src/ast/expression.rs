@@ -46,5 +46,9 @@ pub enum Expression {
         operator: Spanned<UnaryOperator>,
         expression: Box<Expression>,
     },
+    Invocation {
+        expression: Box<Expression>,
+        arguments: Vec<Expression>,
+    },
     Literal(Spanned<Literal>),
 }
