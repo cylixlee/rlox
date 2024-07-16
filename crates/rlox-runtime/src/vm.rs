@@ -21,24 +21,27 @@ impl VirtualMachine {
     }
 
     pub fn run(&mut self) -> DiagnosableResult {
-        macro_rules! arithmetic {
-            ($operator: tt) => {{
-                let span = self.chunk.span(self.program_count);
-                let right = self.stack.pop(span.clone())?;
-                let left = self.stack.pop(span.clone())?;
-                if let (Value::Number(left), Value::Number(right)) = (left, right) {
-                    self.stack.push(Value::Number(left $operator right), span.clone())?;
-                } else {
-                    raise!("E0008", span.clone())
-                }
-            }};
-        }
-
         #[cfg(feature = "stack-monitor")]
         println!("======= Stack Monitor =======");
 
         while self.program_count < self.chunk.len() {
             let instruction = &self.chunk[self.program_count];
+            let span = self.chunk.span(self.program_count).clone();
+
+            macro_rules! binary {
+                ($variant: ident, $operator: tt) => {{
+                    let right = self.stack.pop(span.clone())?;
+                    let left = self.stack.pop(span.clone())?;
+                    if let (Value::Number(left), Value::Number(right)) = (left, right) {
+                        self.stack.push(Value::$variant(left $operator right), span)?;
+                    } else {
+                        raise!("E0008", span)
+                    }
+                }};
+
+                (arithmetic $operator: tt) => { binary!(Number, $operator) };
+                (relational $operator: tt) => { binary!(Boolean, $operator) };
+            }
 
             #[cfg(feature = "stack-monitor")]
             println!("{:04} {:?}", self.program_count, instruction);
@@ -50,10 +53,31 @@ impl VirtualMachine {
                         self.chunk.span(*index).clone(),
                     )?;
                 }
-                Instruction::Add => arithmetic!(+),
-                Instruction::Subtract => arithmetic!(-),
-                Instruction::Multiply => arithmetic!(*),
-                Instruction::Divide => arithmetic!(/),
+                Instruction::Add => binary!(arithmetic+),
+                Instruction::Subtract => binary!(arithmetic -),
+                Instruction::Multiply => binary!(arithmetic *),
+                Instruction::Divide => binary!(arithmetic /),
+                Instruction::Negate => {
+                    if let Value::Number(number) = self.stack.pop(span.clone())? {
+                        self.stack.push(Value::Number(-number), span)?;
+                    } else {
+                        raise!("E0008", span);
+                    }
+                }
+                Instruction::Not => {
+                    let value: bool = self.stack.pop(span.clone())?.into();
+                    self.stack.push(Value::Boolean(!value), span)?;
+                }
+                Instruction::Greater => binary!(relational >),
+                Instruction::Less => binary!(relational <),
+                Instruction::Equal => {
+                    let right = self.stack.pop(span.clone())?;
+                    let left = self.stack.pop(span.clone())?;
+                    self.stack.push(Value::Boolean(left == right), span)?;
+                }
+                Instruction::True => self.stack.push(Value::Boolean(true), span)?,
+                Instruction::False => self.stack.push(Value::Boolean(false), span)?,
+                Instruction::Nil => self.stack.push(Value::Nil, span)?,
             }
 
             #[cfg(feature = "stack-monitor")]
@@ -61,6 +85,10 @@ impl VirtualMachine {
 
             self.program_count += 1;
         }
+
+        #[cfg(feature = "stack-monitor")]
+        println!();
+
         Ok(())
     }
 }

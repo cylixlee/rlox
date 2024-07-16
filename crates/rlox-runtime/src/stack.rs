@@ -6,6 +6,8 @@ use std::slice::{Iter, IterMut};
 
 use rlox_intermediate::{DiagnosableResult, raise, Span};
 
+use crate::value::Value;
+
 pub struct Stack<T, const N: usize> {
     data: [MaybeUninit<T>; N],
     top: usize,
@@ -91,14 +93,15 @@ impl<'a, T, const N: usize> IntoIterator for &'a mut Stack<T, N> {
     }
 }
 
-impl<T, const N: usize> Debug for Stack<T, N>
-where
-    T: Debug,
-{
+impl<const N: usize> Debug for Stack<Value, N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "   ")?;
         for element in self {
-            write!(f, "  [ {element:?} ]")?;
+            match element {
+                Value::Number(number) => write!(f, "  [ {number} ]"),
+                Value::Boolean(boolean) => write!(f, "  [ {boolean} ]"),
+                Value::Nil => write!(f, "  [ nil ]"),
+            }?
         }
         Ok(())
     }
