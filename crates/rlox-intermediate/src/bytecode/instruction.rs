@@ -1,4 +1,8 @@
 #[derive(Debug)]
 pub enum Instruction {
-    Return,
+    LoadConstant(usize),
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
 }

@@ -29,6 +29,18 @@ static ERROR_TABLE: phf::Map<&'static str, ErrorInfo> = phf_map! {
         message: "Unexpected token",
         explanation: "this token is shouldn't be placed here",
     },
+    "E0006" => ErrorInfo {
+        message: "Stack overflow",
+        explanation: "this operation caused VM stack overflow",
+    },
+    "E0007" => ErrorInfo {
+        message: "Stack underflow",
+        explanation: "this operation caused VM stack underflow",
+    },
+    "E0008" => ErrorInfo {
+        message: "Invalid arithmetic operands",
+        explanation: "this operation can only be applied to numbers",
+    },
 };
 
 pub fn raise(error_code: &'static str, span: Span) -> Diagnostic {

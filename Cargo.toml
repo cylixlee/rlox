@@ -14,3 +14,9 @@ panic = "abort"
 rlox-analyzer = { path = "crates/rlox-analyzer" }
 rlox-intermediate = { path = "crates/rlox-intermediate" }
 rlox-runtime = { path = "crates/rlox-runtime" }
+
+[features]
+default = ["trace"]
+trace = ["stack-monitor", "bytecode-preview"]
+stack-monitor = ["rlox-runtime/stack-monitor"]
+bytecode-preview = ["rlox-analyzer/bytecode-preview"]

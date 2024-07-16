@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 logos = "0.14.0"
 rlox-intermediate = { path = "../rlox-intermediate" }
+
+[features]
+bytecode-preview = []

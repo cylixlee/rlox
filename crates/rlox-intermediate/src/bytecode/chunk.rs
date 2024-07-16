@@ -1,34 +1,61 @@
-use std::ops::Index;
-
-use getset::Getters;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::mem;
+use std::ops::Deref;
 
 use crate::{Instruction, Span};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Constant {
     Number(f64),
     String(String),
 }
 
-#[derive(Getters)]
-#[rustfmt::skip]
-pub struct Chunk {
-    #[getset(get = "pub")] instructions: Vec<Instruction>,
-    #[getset(get = "pub")] spans: Vec<Span>,
-    #[getset(get = "pub")] constants: Vec<Constant>,
+impl PartialEq for Constant {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Constant::Number(this), Constant::Number(that)) => (this - that).abs() < f64::EPSILON,
+            (Constant::String(this), Constant::String(that)) => this == that,
+            _ => false,
+        }
+    }
 }
 
-impl Chunk {
+impl Eq for Constant {}
+
+impl Hash for Constant {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        mem::discriminant(self).hash(state);
+        match self {
+            Constant::Number(number) => number.to_bits().hash(state),
+            Constant::String(string) => string.hash(state),
+        }
+    }
+}
+
+pub struct ChunkBuilder {
+    pub instructions: Vec<Instruction>,
+    pub spans: Vec<Span>,
+    pub constants: Vec<Constant>,
+    constants_cache: HashMap<Constant, usize>,
+}
+
+impl ChunkBuilder {
     pub fn new() -> Self {
         Self {
             instructions: Vec::new(),
             spans: Vec::new(),
             constants: Vec::new(),
+            constants_cache: HashMap::new(),
         }
     }
 
-    pub fn len(&self) -> usize {
-        self.instructions.len()
+    pub fn build(self) -> Chunk {
+        Chunk {
+            instructions: self.instructions,
+            spans: self.spans,
+            constants: self.constants,
+        }
     }
 
     pub fn write(&mut self, instruction: Instruction, span: Span) {
@@ -37,15 +64,48 @@ impl Chunk {
     }
 
     pub fn define(&mut self, constant: Constant) -> usize {
+        if let Some(index) = self.constants_cache.get(&constant) {
+            return *index;
+        }
+        let index = self.constants.len();
+        self.constants_cache.insert(constant.clone(), index);
         self.constants.push(constant);
-        self.constants.len() - 1
+        index
     }
 }
 
-impl Index<usize> for Chunk {
-    type Output = Instruction;
+pub struct Chunk {
+    instructions: Vec<Instruction>,
+    spans: Vec<Span>,
+    constants: Vec<Constant>,
+}
 
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.instructions[index]
+impl Chunk {
+    pub fn len(&self) -> usize {
+        self.instructions.len()
+    }
+
+    pub fn spans(&self) -> &Vec<Span> {
+        &self.spans
+    }
+
+    pub fn constants(&self) -> &Vec<Constant> {
+        &self.constants
+    }
+
+    pub fn span(&self, index: usize) -> &Span {
+        &self.spans[index]
+    }
+
+    pub fn constant(&self, index: usize) -> &Constant {
+        &self.constants[index]
+    }
+}
+
+impl Deref for Chunk {
+    type Target = [Instruction];
+
+    fn deref(&self) -> &Self::Target {
+        &self.instructions
     }
 }

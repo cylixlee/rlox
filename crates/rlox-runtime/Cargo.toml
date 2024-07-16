@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 rlox-intermediate = { path = "../rlox-intermediate" }
+
+[features]
+stack-monitor = []
