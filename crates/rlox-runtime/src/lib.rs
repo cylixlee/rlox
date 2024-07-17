@@ -3,6 +3,7 @@
 
 pub use vm::*;
 
+mod heap;
 mod stack;
 mod value;
 mod vm;

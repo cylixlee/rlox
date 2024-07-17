@@ -96,6 +96,11 @@ impl Compiler {
                     self.chunk
                         .write(Instruction::LoadConstant(index), literal.span.clone());
                 }
+                Literal::String(string) => {
+                    let index = self.chunk.define(Constant::String(string.clone()));
+                    self.chunk
+                        .write(Instruction::LoadConstant(index), literal.span.clone());
+                }
                 _ => unimplemented!(),
             },
             _ => unimplemented!(),

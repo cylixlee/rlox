@@ -101,6 +101,13 @@ impl<const N: usize> Debug for Stack<Value, N> {
                 Value::Number(number) => write!(f, "  [ {number} ]"),
                 Value::Boolean(boolean) => write!(f, "  [ {boolean} ]"),
                 Value::Nil => write!(f, "  [ nil ]"),
+                Value::Object(object) => {
+                    if let Some(string) = object.downcast_ref::<String>() {
+                        write!(f, "  [ \"{}\" ]", string)
+                    } else {
+                        write!(f, "  [ {object:?} ]")
+                    }
+                }
             }?
         }
         Ok(())

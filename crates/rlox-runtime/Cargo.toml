@@ -8,3 +8,4 @@ rlox-intermediate = { path = "../rlox-intermediate" }
 
 [features]
 stack-monitor = []
+gc-sanitizer = []

@@ -41,6 +41,10 @@ static ERROR_TABLE: phf::Map<&'static str, ErrorInfo> = phf_map! {
         message: "Invalid arithmetic operands",
         explanation: "this operation can only be applied to numbers",
     },
+    "E0009" => ErrorInfo {
+        message: "Invalid addition/concatenation operands",
+        explanation: "this operation can only be applied to numbers or strings",
+    },
 };
 
 pub fn raise(error_code: &'static str, span: Span) -> Diagnostic {

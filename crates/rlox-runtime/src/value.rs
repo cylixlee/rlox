@@ -1,19 +1,11 @@
-use rlox_intermediate::Constant;
+use crate::heap::Reference;
 
 #[derive(Debug)]
 pub enum Value {
-    Number(f64),
-    Boolean(bool),
     Nil,
-}
-
-impl From<Constant> for Value {
-    fn from(value: Constant) -> Self {
-        match value {
-            Constant::Number(number) => Value::Number(number),
-            _ => unimplemented!(),
-        }
-    }
+    Boolean(bool),
+    Number(f64),
+    Object(Reference<()>),
 }
 
 impl From<Value> for bool {
@@ -32,6 +24,15 @@ impl PartialEq for Value {
             (Value::Nil, Value::Nil) => true,
             (Value::Boolean(this), Value::Boolean(that)) => this == that,
             (Value::Number(this), Value::Number(that)) => (this - that).abs() < f64::EPSILON,
+            (Value::Object(this), Value::Object(that)) => {
+                if this != that {
+                    return match (this.downcast_ref::<String>(), that.downcast_ref::<String>()) {
+                        (Some(this), Some(that)) => this == that,
+                        _ => false,
+                    };
+                }
+                true
+            }
             _ => false,
         }
     }

@@ -1,5 +1,6 @@
-use rlox_intermediate::{Chunk, DiagnosableResult, Instruction, raise};
+use rlox_intermediate::{Chunk, Constant, DiagnosableResult, Instruction, raise};
 
+use crate::heap::Heap;
 use crate::stack::Stack;
 use crate::value::Value;
 
@@ -9,6 +10,7 @@ pub struct VirtualMachine {
     chunk: Chunk,
     program_count: usize,
     stack: Stack<Value, STACK_SIZE>,
+    heap: Heap,
 }
 
 impl VirtualMachine {
@@ -17,6 +19,7 @@ impl VirtualMachine {
             chunk,
             program_count: 0,
             stack: Stack::new(),
+            heap: Heap::new(),
         }
     }
 
@@ -48,12 +51,34 @@ impl VirtualMachine {
 
             match instruction {
                 Instruction::LoadConstant(index) => {
-                    self.stack.push(
-                        self.chunk.constant(*index).clone().into(),
-                        self.chunk.span(*index).clone(),
-                    )?;
+                    let constant = self.chunk.constant(*index).clone();
+                    match constant {
+                        Constant::Number(number) => self.stack.push(Value::Number(number), span)?,
+                        Constant::String(string) => unsafe {
+                            let reference = self.heap.spawn_string(string);
+                            self.stack.push(Value::Object(reference.cast()), span)?;
+                        },
+                    }
                 }
-                Instruction::Add => binary!(arithmetic+),
+                Instruction::Add => {
+                    let right = self.stack.pop(span.clone())?;
+                    let left = self.stack.pop(span.clone())?;
+                    match (left, right) {
+                        (Value::Number(left), Value::Number(right)) => {
+                            self.stack.push(Value::Number(left + right), span)?;
+                        }
+                        (Value::Object(this), Value::Object(that)) => {
+                            match (this.downcast_ref::<String>(), that.downcast_ref::<String>()) {
+                                (Some(this), Some(that)) => unsafe {
+                                    let reference = self.heap.spawn_string(format!("{this}{that}"));
+                                    self.stack.push(Value::Object(reference.cast()), span)?;
+                                },
+                                _ => raise!("E0009", span),
+                            }
+                        }
+                        _ => raise!("E0009", span),
+                    }
+                }
                 Instruction::Subtract => binary!(arithmetic -),
                 Instruction::Multiply => binary!(arithmetic *),
                 Instruction::Divide => binary!(arithmetic /),
