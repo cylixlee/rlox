@@ -19,7 +19,7 @@ static ERROR_TABLE: phf::Map<&'static str, ErrorInfo> = phf_map! {
     },
     "E0003" => ErrorInfo {
         message: "Early EOF",
-        explanation: "expect some token or Semicolon after this, got EOF",
+        explanation: "expect some token (i.g. Semicolon) after this, got EOF",
     },
     "E0004" => ErrorInfo {
         message: "Invalid prefix expression",

@@ -1,4 +1,4 @@
-use rlox_intermediate::{DiagnosableResult, Expression, ForLoopInitializer, Statement};
+use rlox_intermediate::*;
 
 use crate::parser::Parser;
 use crate::scanner::Lexeme;

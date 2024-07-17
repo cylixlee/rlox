@@ -64,6 +64,6 @@ impl<T> DerefMut for Reference<T> {
 
 impl<T> Debug for Reference<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<object: {:p}>", self.pointer,)
+        write!(f, "<object: {:p}>", self.pointer)
     }
 }

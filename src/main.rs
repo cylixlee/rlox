@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 
 use rlox_analyzer::{compiler, parser, scanner};
-use rlox_intermediate::{DiagnosableResult, DiagnosableSource};
+use rlox_intermediate::*;
 use rlox_runtime::VirtualMachine;
 
 fn main() {

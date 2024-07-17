@@ -1,8 +1,6 @@
 use std::mem;
 
-use rlox_intermediate::{
-    BinaryOperator, DiagnosableResult, Expression, Literal, raise, Spanned, UnaryOperator,
-};
+use rlox_intermediate::*;
 
 use crate::parser::Parser;
 use crate::scanner::{Lexeme, Token};

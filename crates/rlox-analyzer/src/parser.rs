@@ -1,4 +1,4 @@
-use rlox_intermediate::{Declaration, DiagnosableResult};
+use rlox_intermediate::*;
 
 use crate::scanner::Token;
 

@@ -41,7 +41,7 @@ impl Drop for Heap {
             #[cfg(feature = "gc-sanitizer")]
             {
                 if let Some(string) = allocation.downcast_ref::<String>() {
-                    println!("-- GC finalize: {allocation:?} {string}");
+                    println!("-- GC finalize: {allocation:?} \"{string}\"");
                 } else {
                     println!("-- GC finalize: {allocation:?}")
                 }

@@ -1,4 +1,4 @@
-use rlox_intermediate::{Declaration, DiagnosableResult, Expression, Spanned};
+use rlox_intermediate::*;
 
 use crate::parser::Parser;
 use crate::scanner::{Lexeme, Token};

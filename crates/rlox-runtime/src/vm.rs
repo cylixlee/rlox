@@ -1,4 +1,4 @@
-use rlox_intermediate::{Chunk, Constant, DiagnosableResult, Instruction, raise};
+use rlox_intermediate::*;
 
 use crate::heap::Heap;
 use crate::stack::Stack;
@@ -64,9 +64,11 @@ impl VirtualMachine {
                     let right = self.stack.pop(span.clone())?;
                     let left = self.stack.pop(span.clone())?;
                     match (left, right) {
+                        // arithmetic addition
                         (Value::Number(left), Value::Number(right)) => {
                             self.stack.push(Value::Number(left + right), span)?;
                         }
+                        // string concatenation
                         (Value::Object(this), Value::Object(that)) => {
                             match (this.downcast_ref::<String>(), that.downcast_ref::<String>()) {
                                 (Some(this), Some(that)) => unsafe {

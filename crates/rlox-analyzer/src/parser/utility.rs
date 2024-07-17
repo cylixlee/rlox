@@ -1,6 +1,6 @@
 use std::mem;
 
-use rlox_intermediate::{DiagnosableResult, raise};
+use rlox_intermediate::*;
 
 use crate::parser::Parser;
 use crate::scanner::{Lexeme, Token};

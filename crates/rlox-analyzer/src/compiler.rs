@@ -1,7 +1,4 @@
-use rlox_intermediate::{
-    BinaryOperator, Chunk, ChunkBuilder, Constant, Declaration, Expression, Instruction, Literal,
-    Statement, UnaryOperator,
-};
+use rlox_intermediate::*;
 
 struct Compiler {
     offset: usize,

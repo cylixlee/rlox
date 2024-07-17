@@ -2,7 +2,7 @@ use std::num::ParseFloatError;
 
 use logos::{Lexer, Logos};
 
-use rlox_intermediate::{DiagnosableResult, raise, Spanned};
+use rlox_intermediate::*;
 
 #[rustfmt::skip]
 #[derive(Logos, Debug, PartialEq, Clone)]

@@ -4,7 +4,7 @@ use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::slice::{Iter, IterMut};
 
-use rlox_intermediate::{DiagnosableResult, raise, Span};
+use rlox_intermediate::*;
 
 use crate::value::Value;
 
