@@ -1,4 +1,4 @@
-use crate::Spanned;
+use crate::{Span, Spanned};
 
 #[derive(Debug)]
 pub enum Literal {
@@ -37,6 +37,11 @@ pub enum BinaryOperator {
 
 #[derive(Debug)]
 pub enum Expression {
+    Assignment {
+        left: Box<Expression>,
+        span: Span,
+        right: Box<Expression>,
+    },
     Binary {
         left: Box<Expression>,
         operator: Spanned<BinaryOperator>,

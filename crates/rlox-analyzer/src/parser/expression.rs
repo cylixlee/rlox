@@ -93,6 +93,7 @@ impl Parser {
             }
             expression = match infix.deref() {
                 Lexeme::LeftParenthesis => self.parse_invocation(expression)?,
+                Lexeme::Equal => self.parse_assignment(expression)?,
                 _ => self.parse_binary(expression)?,
             };
         }
@@ -133,16 +134,24 @@ impl Parser {
         })
     }
 
+    fn parse_assignment(&mut self, left: Expression) -> DiagnosableResult<Expression> {
+        #[rustfmt::skip]
+        let Token { value: operator, span } = self.must_advance()?.clone();
+        let precedence = operator.precedence();
+        let right = self.parse_precedence(precedence)?;
+        Ok(Expression::Assignment {
+            left: Box::new(left),
+            span,
+            right: Box::new(right),
+        })
+    }
+
     fn parse_binary(&mut self, left: Expression) -> DiagnosableResult<Expression> {
         #[rustfmt::skip]
         let Token { value: operator, span } = self.must_advance()?.clone();
         let precedence = operator.precedence();
-        let right = match operator {
-            Lexeme::Equal => self.parse_precedence(precedence),
-            _ => self.parse_precedence(precedence.increase()),
-        }?;
+        let right = self.parse_precedence(precedence.increase())?;
         let operator = match operator {
-            Lexeme::Equal => BinaryOperator::Assign,
             Lexeme::Or => BinaryOperator::Or,
             Lexeme::And => BinaryOperator::And,
             Lexeme::EqualEqual => BinaryOperator::Equal,

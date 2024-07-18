@@ -59,52 +59,51 @@ impl Compiler {
 
     fn compile_expression(&mut self, expression: &Expression) -> DiagnosableResult {
         match expression {
+            Expression::Assignment { left, span, right } => {
+                self.compile_expression(right)?;
+                match left.deref() {
+                    Expression::Binary { .. } => unimplemented!(),
+                    Expression::Literal(literal) => match literal.deref() {
+                        Literal::Identifier(identifier) => {
+                            let index = self.chunk.define(Constant::String(identifier.clone()));
+                            self.chunk
+                                .write(Instruction::LoadConstant(index), literal.span.clone());
+                            self.chunk.append(Instruction::SetGlobal);
+                        }
+                        _ => raise!("E0013", literal.span.clone()),
+                    },
+                    _ => raise!("E0013", span.clone()),
+                }
+            }
             Expression::Binary {
                 left,
                 operator,
                 right,
             } => {
-                if let BinaryOperator::Assign = operator.deref() {
-                    self.compile_expression(right)?;
-                    match left.deref() {
-                        Expression::Binary { .. } => unimplemented!(),
-                        Expression::Literal(literal) => match literal.deref() {
-                            Literal::Identifier(identifier) => {
-                                let index = self.chunk.define(Constant::String(identifier.clone()));
-                                self.chunk
-                                    .write(Instruction::LoadConstant(index), literal.span.clone());
-                                self.chunk.append(Instruction::SetGlobal);
-                            }
-                            _ => raise!("E0013", literal.span.clone()),
-                        },
-                        _ => raise!("E0013", operator.span.clone()),
+                self.compile_expression(left)?;
+                self.compile_expression(right)?;
+                let span = operator.span.clone();
+                match operator.deref() {
+                    BinaryOperator::Add => self.chunk.write(Instruction::Add, span),
+                    BinaryOperator::Subtract => self.chunk.write(Instruction::Subtract, span),
+                    BinaryOperator::Multiply => self.chunk.write(Instruction::Multiply, span),
+                    BinaryOperator::Divide => self.chunk.write(Instruction::Divide, span),
+                    BinaryOperator::Equal => self.chunk.write(Instruction::Equal, span),
+                    BinaryOperator::Greater => self.chunk.write(Instruction::Greater, span),
+                    BinaryOperator::Less => self.chunk.write(Instruction::Less, span),
+                    BinaryOperator::NotEqual => {
+                        self.chunk.write(Instruction::Equal, span.clone());
+                        self.chunk.write(Instruction::Not, span);
                     }
-                } else {
-                    self.compile_expression(left)?;
-                    self.compile_expression(right)?;
-                    let span = operator.span.clone();
-                    match operator.deref() {
-                        BinaryOperator::Add => self.chunk.write(Instruction::Add, span),
-                        BinaryOperator::Subtract => self.chunk.write(Instruction::Subtract, span),
-                        BinaryOperator::Multiply => self.chunk.write(Instruction::Multiply, span),
-                        BinaryOperator::Divide => self.chunk.write(Instruction::Divide, span),
-                        BinaryOperator::Equal => self.chunk.write(Instruction::Equal, span),
-                        BinaryOperator::Greater => self.chunk.write(Instruction::Greater, span),
-                        BinaryOperator::Less => self.chunk.write(Instruction::Less, span),
-                        BinaryOperator::NotEqual => {
-                            self.chunk.write(Instruction::Equal, span.clone());
-                            self.chunk.write(Instruction::Not, span);
-                        }
-                        BinaryOperator::GreaterEqual => {
-                            self.chunk.write(Instruction::Less, span.clone());
-                            self.chunk.write(Instruction::Not, span);
-                        }
-                        BinaryOperator::LessEqual => {
-                            self.chunk.write(Instruction::Greater, span.clone());
-                            self.chunk.write(Instruction::Not, span.clone());
-                        }
-                        _ => unimplemented!(),
+                    BinaryOperator::GreaterEqual => {
+                        self.chunk.write(Instruction::Less, span.clone());
+                        self.chunk.write(Instruction::Not, span);
                     }
+                    BinaryOperator::LessEqual => {
+                        self.chunk.write(Instruction::Greater, span.clone());
+                        self.chunk.write(Instruction::Not, span.clone());
+                    }
+                    _ => unimplemented!(),
                 }
             }
             Expression::Unary {
