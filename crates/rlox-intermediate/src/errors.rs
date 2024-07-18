@@ -45,6 +45,22 @@ static ERROR_TABLE: phf::Map<&'static str, ErrorInfo> = phf_map! {
         message: "Invalid addition/concatenation operands",
         explanation: "this operation can only be applied to numbers or strings",
     },
+    "E0010" => ErrorInfo {
+        message: "Invalid identifier",
+        explanation: "this token cannot be used as an identifier",
+    },
+    "E0011" => ErrorInfo {
+        message: "Multiple definition",
+        explanation: "this variable is already defined previously",
+    },
+    "E0012" => ErrorInfo {
+        message: "Undefined variable",
+        explanation: "this variable is never defined",
+    },
+    "E0013" => ErrorInfo {
+        message: "Invalid assignment target",
+        explanation: "the left operand is not assignable",
+    },
 };
 
 pub fn raise(error_code: &'static str, span: Span) -> Diagnostic {

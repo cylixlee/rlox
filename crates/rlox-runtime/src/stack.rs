@@ -25,6 +25,19 @@ impl<T, const N: usize> Stack<T, N> {
         self.top
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn top(&self, span: Span) -> DiagnosableResult<&T> {
+        if self.top > 0 {
+            unsafe {
+                return Ok(self.data[self.top - 1].assume_init_ref());
+            }
+        }
+        raise!("E0007", span)
+    }
+
     pub fn push(&mut self, element: T, span: Span) -> DiagnosableResult {
         if self.top < N {
             self.data[self.top] = MaybeUninit::new(element);
@@ -101,7 +114,7 @@ impl<const N: usize> Debug for Stack<Value, N> {
                 Value::Number(number) => write!(f, "  [ {number} ]"),
                 Value::Boolean(boolean) => write!(f, "  [ {boolean} ]"),
                 Value::Nil => write!(f, "  [ nil ]"),
-                Value::String(string) => write!(f, "  [ {} ]", &**string),
+                Value::String(string) => write!(f, "  [ \"{}\" ]", string.deref()),
             }?
         }
         Ok(())

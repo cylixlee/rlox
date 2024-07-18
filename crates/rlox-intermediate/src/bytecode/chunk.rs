@@ -63,6 +63,11 @@ impl ChunkBuilder {
         self.spans.push(span);
     }
 
+    pub fn append(&mut self, instruction: Instruction) {
+        let span = self.spans.last().unwrap().clone();
+        self.write(instruction, span);
+    }
+
     pub fn define(&mut self, constant: Constant) -> usize {
         if let Some(index) = self.constants_cache.get(&constant) {
             return *index;

@@ -4,6 +4,7 @@
 use std::fmt::Display;
 use std::io;
 use std::io::Write;
+use std::ops::Deref;
 
 use rlox_analyzer::{compiler, parser, scanner};
 use rlox_intermediate::*;
@@ -31,8 +32,8 @@ where
     N: Display + Clone,
     S: AsRef<str>,
 {
-    let tokens = scanner::scan(&**source)?;
+    let tokens = scanner::scan(source.deref())?;
     let declarations = parser::parse(tokens)?;
-    let chunk = compiler::compile(declarations);
+    let chunk = compiler::compile(declarations)?;
     VirtualMachine::new(chunk).run()
 }

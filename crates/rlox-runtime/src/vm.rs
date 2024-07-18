@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::ops::Deref;
+
 use rlox_intermediate::*;
 
 use crate::heap::Heap;
@@ -11,6 +14,7 @@ pub struct VirtualMachine {
     program_count: usize,
     stack: Stack<Value, STACK_SIZE>,
     heap: Heap,
+    globals: HashMap<String, Value>,
 }
 
 impl VirtualMachine {
@@ -20,6 +24,7 @@ impl VirtualMachine {
             program_count: 0,
             stack: Stack::new(),
             heap: Heap::new(),
+            globals: HashMap::new(),
         }
     }
 
@@ -71,7 +76,8 @@ impl VirtualMachine {
                         // string concatenation
                         (Value::String(this), Value::String(that)) => {
                             let reference =
-                                self.heap.spawn_string(format!("{}{}", &**this, &**that));
+                                self.heap
+                                    .spawn_string(format!("{}{}", this.deref(), that.deref()));
                             self.stack.push(Value::String(reference), span)?;
                         }
                         _ => raise!("E0009", span),
@@ -101,10 +107,53 @@ impl VirtualMachine {
                 Instruction::True => self.stack.push(Value::Boolean(true), span)?,
                 Instruction::False => self.stack.push(Value::Boolean(false), span)?,
                 Instruction::Nil => self.stack.push(Value::Nil, span)?,
+                Instruction::Print => {
+                    let value = self.stack.pop(span)?;
+                    println!("{value}");
+                }
+                Instruction::Pop => {
+                    self.stack.pop(span)?;
+                }
+                Instruction::DefineGlobal => {
+                    let name = match self.stack.pop(span.clone())? {
+                        Value::String(identifier) => identifier,
+                        _ => raise!("E0010", span),
+                    };
+                    let value = self.stack.pop(span.clone())?;
+                    if self.globals.contains_key(name.deref()) {
+                        raise!("E0011", span);
+                    }
+                    self.globals.insert(name.deref().clone(), value);
+                }
+                Instruction::GetGlobal => {
+                    let name = match self.stack.pop(span.clone())? {
+                        Value::String(identifier) => identifier,
+                        _ => raise!("E0010", span),
+                    };
+                    if let Some(value) = self.globals.get(name.deref()) {
+                        self.stack.push(value.clone(), span)?;
+                    } else {
+                        raise!("E0012", span);
+                    }
+                }
+                Instruction::SetGlobal => {
+                    let name = match self.stack.pop(span.clone())? {
+                        Value::String(identifier) => identifier,
+                        _ => raise!("E0010", span),
+                    };
+                    let value = self.stack.top(span.clone())?.clone();
+                    if let Some(variable) = self.globals.get_mut(name.deref()) {
+                        *variable = value;
+                    } else {
+                        raise!("E0012", span);
+                    }
+                }
             }
 
             #[cfg(feature = "stack-monitor")]
-            println!("{:?}", self.stack);
+            if !self.stack.is_empty() {
+                println!("{:?}", self.stack);
+            }
 
             self.program_count += 1;
         }

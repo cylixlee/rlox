@@ -19,4 +19,13 @@ pub enum Instruction {
     True,
     False,
     Nil,
+
+    // Stack operation
+    Print,
+    Pop,
+
+    // Variable operation
+    DefineGlobal,
+    GetGlobal,
+    SetGlobal,
 }

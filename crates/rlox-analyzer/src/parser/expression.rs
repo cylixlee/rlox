@@ -1,4 +1,5 @@
 use std::mem;
+use std::ops::Deref;
 
 use rlox_intermediate::*;
 
@@ -7,7 +8,7 @@ use crate::scanner::{Lexeme, Token};
 
 #[repr(u8)]
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
-enum InfixPrecedence {
+enum Precedence {
     None,
     Assignment,     // right associative
     ConditionalOr,  // left associative
@@ -21,7 +22,7 @@ enum InfixPrecedence {
     Impossible,
 }
 
-impl InfixPrecedence {
+impl Precedence {
     pub fn increase(&self) -> Self {
         let number = *self as u8;
         if number < Self::Impossible as u8 {
@@ -33,30 +34,30 @@ impl InfixPrecedence {
 }
 
 impl Lexeme {
-    fn precedence(&self) -> InfixPrecedence {
+    fn precedence(&self) -> Precedence {
         match self {
-            Lexeme::Equal => InfixPrecedence::Assignment,
-            Lexeme::Or => InfixPrecedence::ConditionalOr,
-            Lexeme::And => InfixPrecedence::ConditionalAnd,
-            Lexeme::EqualEqual | Lexeme::BangEqual => InfixPrecedence::Equality,
+            Lexeme::Equal => Precedence::Assignment,
+            Lexeme::Or => Precedence::ConditionalOr,
+            Lexeme::And => Precedence::ConditionalAnd,
+            Lexeme::EqualEqual | Lexeme::BangEqual => Precedence::Equality,
             Lexeme::Greater | Lexeme::GreaterEqual | Lexeme::Less | Lexeme::LessEqual => {
-                InfixPrecedence::Relational
+                Precedence::Relational
             }
-            Lexeme::Plus | Lexeme::Minus => InfixPrecedence::Additive,
-            Lexeme::Star | Lexeme::Slash => InfixPrecedence::Multiplicative,
-            Lexeme::LeftParenthesis => InfixPrecedence::Invocation,
-            Lexeme::Dot => InfixPrecedence::Property,
-            _ => InfixPrecedence::None,
+            Lexeme::Plus | Lexeme::Minus => Precedence::Additive,
+            Lexeme::Star | Lexeme::Slash => Precedence::Multiplicative,
+            Lexeme::LeftParenthesis => Precedence::Invocation,
+            Lexeme::Dot => Precedence::Property,
+            _ => Precedence::None,
         }
     }
 }
 
 impl Parser {
     pub fn parse_expression(&mut self) -> DiagnosableResult<Expression> {
-        self.parse_precedence(InfixPrecedence::Assignment)
+        self.parse_precedence(Precedence::Assignment)
     }
 
-    fn parse_precedence(&mut self, precedence: InfixPrecedence) -> DiagnosableResult<Expression> {
+    fn parse_precedence(&mut self, precedence: Precedence) -> DiagnosableResult<Expression> {
         // parse prefix expressions.
         let Token { value, span } = self.must_peek()?.clone();
         macro_rules! literal {
@@ -90,7 +91,7 @@ impl Parser {
             if infix.precedence() < precedence {
                 break;
             }
-            expression = match &**infix {
+            expression = match infix.deref() {
                 Lexeme::LeftParenthesis => self.parse_invocation(expression)?,
                 _ => self.parse_binary(expression)?,
             };
@@ -118,7 +119,7 @@ impl Parser {
     fn parse_unary(&mut self) -> DiagnosableResult<Expression> {
         #[rustfmt::skip]
         let Token { value: operator, span } = self.must_advance()?.clone();
-        let expression = self.parse_precedence(InfixPrecedence::Property)?;
+        let expression = self.parse_precedence(Precedence::Property)?;
         Ok(match operator {
             Lexeme::Bang => Expression::Unary {
                 operator: Spanned::new(UnaryOperator::Not, span.clone()),
