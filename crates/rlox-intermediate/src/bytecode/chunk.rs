@@ -103,6 +103,10 @@ impl Chunk {
         self.instructions.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.instructions.is_empty()
+    }
+
     pub fn spans(&self) -> &Vec<Span> {
         &self.spans
     }

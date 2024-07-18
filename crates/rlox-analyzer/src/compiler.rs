@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::Deref;
 
 use rlox_intermediate::*;
@@ -19,12 +20,22 @@ impl Compiler {
         }
     }
 
+    fn predefine_parameters(&mut self, parameters: Vec<Spanned<String>>) {
+        for parameter in parameters {
+            self.locals.push(parameter.into_inner());
+        }
+    }
+
     fn compile(mut self, program: Vec<Declaration>) -> DiagnosableResult<Chunk> {
         while self.offset < program.len() {
             self.compile_declaration(&program[self.offset])?;
             self.offset += 1;
         }
-        Ok(self.chunk.build())
+        Ok(self.emit())
+    }
+
+    fn emit(self) -> Chunk {
+        self.chunk.build()
     }
 
     fn compile_declaration(&mut self, declaration: &Declaration) -> DiagnosableResult {
@@ -243,6 +254,26 @@ impl Compiler {
                     UnaryOperator::Negate => self.chunk.write(Instruction::Negate, span),
                 }
             }
+            Expression::Invocation {
+                expression,
+                arguments,
+            } => {
+                for argument in arguments {
+                    self.compile_expression(argument)?;
+                }
+                match expression.deref() {
+                    Expression::Literal(literal) => match literal.deref() {
+                        Literal::Identifier(identifier) => {
+                            let index = self.chunk.define(Constant::String(identifier.clone()));
+                            self.chunk
+                                .write(Instruction::LoadConstant(index), literal.span.clone());
+                        }
+                        _ => raise!("E0014", literal.span.clone()),
+                    },
+                    _ => unimplemented!(),
+                }
+                self.chunk.append(Instruction::Invoke);
+            }
             Expression::Literal(literal) => match literal.deref() {
                 Literal::Nil => self.chunk.write(Instruction::Nil, literal.span.clone()),
                 Literal::Boolean(boolean) => {
@@ -272,12 +303,13 @@ impl Compiler {
                                 .write(Instruction::LoadConstant(index), literal.span.clone());
                             self.chunk.append(Instruction::GetGlobal);
                         }
-                        Some(index) => self.chunk.append(Instruction::GetLocal(index)),
+                        Some(index) => self
+                            .chunk
+                            .write(Instruction::GetLocal(index), literal.span.clone()),
                     }
                 }
                 _ => unimplemented!(),
             },
-            _ => unimplemented!(),
         }
         Ok(())
     }
@@ -306,19 +338,59 @@ impl Compiler {
     }
 }
 
-pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Chunk> {
-    let chunk = Compiler::new().compile(program)?;
-    #[cfg(feature = "bytecode-preview")]
-    {
-        println!("━━━━━━━ Instructions ━━━━━━━━");
-        for (index, instruction) in chunk.iter().enumerate() {
-            println!("{index:04} {instruction:?}");
-        }
-
-        println!("━━━━━━━━━ Constants ━━━━━━━━━");
-        for (index, constant) in chunk.constants().iter().enumerate() {
-            println!("{index:03}  {constant:?}");
+pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Bytecode> {
+    let mut script = Vec::new();
+    let mut functions = HashMap::new();
+    for declaration in program {
+        match declaration {
+            Declaration::Function {
+                name,
+                parameters,
+                body,
+            } => {
+                let mut compiler = Compiler::new();
+                let arity = parameters.len();
+                compiler.begin_scope();
+                compiler.predefine_parameters(parameters);
+                compiler.compile_statement(&body)?;
+                compiler.end_scope();
+                let function = Function {
+                    chunk: compiler.emit(),
+                    arity,
+                };
+                functions.insert(name.into_inner(), function);
+            }
+            _ => script.push(declaration),
         }
     }
-    Ok(chunk)
+    let script = Compiler::new().compile(script)?;
+    let bytecode = Bytecode { functions, script };
+    #[cfg(feature = "bytecode-preview")]
+    {
+        println!("━━━━━━━━━━ Bytecode Preview Start ━━━━━━━━━━");
+        for (name, function) in &bytecode.functions {
+            println!("function \"{name}\", arity = {}", function.arity);
+            preview_chunk(&function.chunk);
+            println!();
+        }
+        println!("<entrypoint>");
+        preview_chunk(&bytecode.script);
+    }
+    Ok(bytecode)
+}
+
+#[cfg(feature = "bytecode-preview")]
+fn preview_chunk(chunk: &Chunk) {
+    if !chunk.is_empty() {
+        println!("INSTRUCTIONS ({}):", chunk.len());
+        for (index, instruction) in chunk.iter().enumerate() {
+            println!("    {index:04} {instruction:?}");
+        }
+        if !chunk.constants().is_empty() {
+            println!("CONSTANTS ({}):", chunk.constants().len());
+            for (index, constant) in chunk.constants().iter().enumerate() {
+                println!("    {index:03} {constant:?}");
+            }
+        }
+    }
 }

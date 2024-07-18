@@ -61,6 +61,14 @@ static ERROR_TABLE: phf::Map<&'static str, ErrorInfo> = phf_map! {
         message: "Invalid assignment target",
         explanation: "the left operand is not assignable",
     },
+    "E0014" => ErrorInfo {
+        message: "Invalid invocation target",
+        explanation: "this target is not invokable",
+    },
+    "E0015" => ErrorInfo {
+        message: "Undefined function",
+        explanation: "no function matches this invocation",
+    },
 };
 
 pub fn raise(error_code: &'static str, span: Span) -> Diagnostic {

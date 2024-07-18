@@ -102,6 +102,7 @@ impl Parser {
         } else {
             Some(self.parse_expression()?)
         };
+        self.must_consume(&Lexeme::Semicolon)?;
         Ok(Statement::Return(expression))
     }
 

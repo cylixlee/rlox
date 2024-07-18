@@ -15,6 +15,10 @@ impl<T> Spanned<T> {
             span: span.into(),
         }
     }
+
+    pub fn into_inner(self) -> T {
+        self.value
+    }
 }
 
 impl<T> Deref for Spanned<T> {

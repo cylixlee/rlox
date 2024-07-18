@@ -166,6 +166,7 @@ impl VirtualMachine {
                     self.program_count = (self.program_count as isize + offset) as usize;
                     continue;
                 }
+                Instruction::Invoke => unimplemented!(),
             }
 
             #[cfg(feature = "stack-monitor")]
