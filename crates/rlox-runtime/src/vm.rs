@@ -7,7 +7,7 @@ use crate::heap::Heap;
 use crate::stack::Stack;
 use crate::value::Value;
 
-const STACK_SIZE: usize = 4 * 1024;
+const STACK_SIZE: usize = 1024;
 
 pub struct VirtualMachine {
     chunk: Chunk,
@@ -94,7 +94,7 @@ impl VirtualMachine {
                     }
                 }
                 Instruction::Not => {
-                    let value: bool = self.stack.pop(span.clone())?.into();
+                    let value: bool = self.stack.pop(span.clone())?.boolean();
                     self.stack.push(Value::Boolean(!value), span)?;
                 }
                 Instruction::Greater => binary!(relational >),
@@ -154,6 +154,17 @@ impl VirtualMachine {
                 Instruction::SetLocal(index) => {
                     let value = self.stack.top(span)?.clone();
                     self.stack[*index] = value;
+                }
+                Instruction::JumpIfFalse(offset) => {
+                    let condition: bool = self.stack.top(span)?.boolean();
+                    if !condition {
+                        self.program_count = (self.program_count as isize + offset) as usize;
+                        continue;
+                    }
+                }
+                Instruction::Jump(offset) => {
+                    self.program_count = (self.program_count as isize + offset) as usize;
+                    continue;
                 }
             }
 

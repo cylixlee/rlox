@@ -4,6 +4,7 @@ use std::mem;
 use std::ops::Deref;
 
 use crate::{Instruction, Span};
+use crate::bytecode::backpatcher::{Backpatch, JumpBackpatcher, JumpIfFalseBackpatcher};
 
 #[derive(Debug, Clone)]
 pub enum Constant {
@@ -61,6 +62,18 @@ impl ChunkBuilder {
     pub fn write(&mut self, instruction: Instruction, span: Span) {
         self.instructions.push(instruction);
         self.spans.push(span);
+    }
+
+    pub fn append_backpatch(&mut self, instruction: Instruction) -> Box<dyn Backpatch> {
+        let index = self.instructions.len();
+        self.append(instruction.clone());
+        match instruction {
+            Instruction::JumpIfFalse(_) => {
+                Box::new(JumpIfFalseBackpatcher::new(&mut self.instructions, index))
+            }
+            Instruction::Jump(_) => Box::new(JumpBackpatcher::new(&mut self.instructions, index)),
+            _ => unreachable!(),
+        }
     }
 
     pub fn append(&mut self, instruction: Instruction) {
