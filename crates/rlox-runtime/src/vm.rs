@@ -54,10 +54,10 @@ impl VirtualMachine {
                     let constant = self.chunk.constant(*index).clone();
                     match constant {
                         Constant::Number(number) => self.stack.push(Value::Number(number), span)?,
-                        Constant::String(string) => unsafe {
+                        Constant::String(string) => {
                             let reference = self.heap.spawn_string(string);
-                            self.stack.push(Value::Object(reference.cast()), span)?;
-                        },
+                            self.stack.push(Value::String(reference), span)?;
+                        }
                     }
                 }
                 Instruction::Add => {
@@ -69,14 +69,10 @@ impl VirtualMachine {
                             self.stack.push(Value::Number(left + right), span)?;
                         }
                         // string concatenation
-                        (Value::Object(this), Value::Object(that)) => {
-                            match (this.downcast_ref::<String>(), that.downcast_ref::<String>()) {
-                                (Some(this), Some(that)) => unsafe {
-                                    let reference = self.heap.spawn_string(format!("{this}{that}"));
-                                    self.stack.push(Value::Object(reference.cast()), span)?;
-                                },
-                                _ => raise!("E0009", span),
-                            }
+                        (Value::String(this), Value::String(that)) => {
+                            let reference =
+                                self.heap.spawn_string(format!("{}{}", &**this, &**that));
+                            self.stack.push(Value::String(reference), span)?;
                         }
                         _ => raise!("E0009", span),
                     }

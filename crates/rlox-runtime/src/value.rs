@@ -5,7 +5,7 @@ pub enum Value {
     Nil,
     Boolean(bool),
     Number(f64),
-    Object(Reference<()>),
+    String(Reference<String>),
 }
 
 impl From<Value> for bool {
@@ -24,14 +24,11 @@ impl PartialEq for Value {
             (Value::Nil, Value::Nil) => true,
             (Value::Boolean(this), Value::Boolean(that)) => this == that,
             (Value::Number(this), Value::Number(that)) => (this - that).abs() < f64::EPSILON,
-            (Value::Object(this), Value::Object(that)) => {
-                if this != that {
-                    return match (this.downcast_ref::<String>(), that.downcast_ref::<String>()) {
-                        (Some(this), Some(that)) => this == that,
-                        _ => false,
-                    };
+            (Value::String(this), Value::String(that)) => {
+                if this == that {
+                    return true;
                 }
-                true
+                &**this == &**that
             }
             _ => false,
         }
