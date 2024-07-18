@@ -28,4 +28,7 @@ pub enum Instruction {
     DefineGlobal,
     GetGlobal,
     SetGlobal,
+    // there's no DefineLocal because locals are "defined" when initializer expression evaluated.
+    GetLocal(usize),
+    SetLocal(usize),
 }

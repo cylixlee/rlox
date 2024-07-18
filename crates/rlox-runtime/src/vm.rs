@@ -30,7 +30,7 @@ impl VirtualMachine {
 
     pub fn run(&mut self) -> DiagnosableResult {
         #[cfg(feature = "stack-monitor")]
-        println!("======= Stack Monitor =======");
+        println!("━━━━━━━ Stack Monitor ━━━━━━━");
 
         while self.program_count < self.chunk.len() {
             let instruction = &self.chunk[self.program_count];
@@ -147,6 +147,13 @@ impl VirtualMachine {
                     } else {
                         raise!("E0012", span);
                     }
+                }
+                Instruction::GetLocal(index) => {
+                    self.stack.push(self.stack[*index].clone(), span)?
+                }
+                Instruction::SetLocal(index) => {
+                    let value = self.stack.top(span)?.clone();
+                    self.stack[*index] = value;
                 }
             }
 

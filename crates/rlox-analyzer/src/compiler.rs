@@ -5,6 +5,8 @@ use rlox_intermediate::*;
 struct Compiler {
     offset: usize,
     chunk: ChunkBuilder,
+    locals: Vec<String>,
+    blocks: Vec<usize>,
 }
 
 impl Compiler {
@@ -12,6 +14,8 @@ impl Compiler {
         Self {
             offset: 0,
             chunk: ChunkBuilder::new(),
+            locals: Vec::new(),
+            blocks: Vec::new(),
         }
     }
 
@@ -26,15 +30,24 @@ impl Compiler {
     fn compile_declaration(&mut self, declaration: &Declaration) -> DiagnosableResult {
         match declaration {
             Declaration::Var { name, initializer } => {
+                // initial value
                 if let Some(initializer) = initializer {
                     self.compile_expression(initializer)?;
                 } else {
                     self.chunk.write(Instruction::Nil, name.span.clone());
                 }
-                let index = self.chunk.define(Constant::String(name.deref().clone()));
-                self.chunk
-                    .write(Instruction::LoadConstant(index), name.span.clone());
-                self.chunk.append(Instruction::DefineGlobal);
+                // determine whether it is global or local
+                if self.blocks.is_empty() {
+                    // load global variable name (identifier)
+                    let index = self.chunk.define(Constant::String(name.deref().clone()));
+                    self.chunk
+                        .write(Instruction::LoadConstant(index), name.span.clone());
+                    self.chunk.append(Instruction::DefineGlobal);
+                } else {
+                    // there's no need to generate SetLocal.
+                    // local variables are defined once initializer expression calculated.
+                    self.locals.push(name.deref().clone());
+                }
             }
             Declaration::Statement(statement) => self.compile_statement(statement)?,
             _ => unimplemented!(),
@@ -52,6 +65,18 @@ impl Compiler {
                 self.compile_expression(expression)?;
                 self.chunk.append(Instruction::Print);
             }
+            Statement::Block(declarations) => {
+                self.blocks.push(self.locals.len());
+                for declaration in declarations {
+                    self.compile_declaration(declaration)?;
+                }
+                let frame = *self.blocks.last().unwrap();
+                while self.locals.len() > frame {
+                    self.locals.pop();
+                    self.chunk.append(Instruction::Pop);
+                }
+                self.blocks.pop();
+            }
             _ => unimplemented!(),
         }
         Ok(())
@@ -60,15 +85,24 @@ impl Compiler {
     fn compile_expression(&mut self, expression: &Expression) -> DiagnosableResult {
         match expression {
             Expression::Assignment { left, span, right } => {
+                // prepare assignment value
                 self.compile_expression(right)?;
                 match left.deref() {
                     Expression::Binary { .. } => unimplemented!(),
                     Expression::Literal(literal) => match literal.deref() {
                         Literal::Identifier(identifier) => {
-                            let index = self.chunk.define(Constant::String(identifier.clone()));
-                            self.chunk
-                                .write(Instruction::LoadConstant(index), literal.span.clone());
-                            self.chunk.append(Instruction::SetGlobal);
+                            // determine whether it is global or local
+                            if self.blocks.is_empty() {
+                                // load global variable name (identifier)
+                                let index = self.chunk.define(Constant::String(identifier.clone()));
+                                self.chunk
+                                    .write(Instruction::LoadConstant(index), literal.span.clone());
+                                self.chunk.append(Instruction::SetGlobal);
+                            } else {
+                                let index = self.locals.len();
+                                self.locals.push(identifier.clone());
+                                self.chunk.append(Instruction::SetLocal(index));
+                            }
                         }
                         _ => raise!("E0013", literal.span.clone()),
                     },
@@ -137,10 +171,24 @@ impl Compiler {
                         .write(Instruction::LoadConstant(index), literal.span.clone());
                 }
                 Literal::Identifier(identifier) => {
-                    let index = self.chunk.define(Constant::String(identifier.clone()));
-                    self.chunk
-                        .write(Instruction::LoadConstant(index), literal.span.clone());
-                    self.chunk.append(Instruction::GetGlobal);
+                    // determine whether it is global or local
+                    let mut local_index = None;
+                    for (index, name) in self.locals.iter().rev().enumerate() {
+                        if name == identifier {
+                            local_index = Some(self.locals.len() - index - 1);
+                            break;
+                        }
+                    }
+                    match local_index {
+                        None => {
+                            // load global variable name (identifier)
+                            let index = self.chunk.define(Constant::String(identifier.clone()));
+                            self.chunk
+                                .write(Instruction::LoadConstant(index), literal.span.clone());
+                            self.chunk.append(Instruction::GetGlobal);
+                        }
+                        Some(index) => self.chunk.append(Instruction::GetLocal(index)),
+                    }
                 }
                 _ => unimplemented!(),
             },
@@ -154,12 +202,12 @@ pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Chunk> {
     let chunk = Compiler::new().compile(program)?;
     #[cfg(feature = "bytecode-preview")]
     {
-        println!("======= Instructions ========");
+        println!("━━━━━━━ Instructions ━━━━━━━━");
         for (index, instruction) in chunk.iter().enumerate() {
             println!("{index:04} {instruction:?}");
         }
 
-        println!("========= Constants =========");
+        println!("━━━━━━━━━ Constants ━━━━━━━━━");
         for (index, constant) in chunk.constants().iter().enumerate() {
             println!("{index:03}  {constant:?}");
         }
