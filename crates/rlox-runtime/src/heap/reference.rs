@@ -62,6 +62,15 @@ impl<T> DerefMut for Reference<T> {
     }
 }
 
+impl<T> AsRef<str> for Reference<T>
+where
+    T: AsRef<str>,
+{
+    fn as_ref(&self) -> &str {
+        self.deref().as_ref()
+    }
+}
+
 impl<T> Debug for Reference<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "<object: {:p}>", self.pointer)

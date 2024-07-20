@@ -8,6 +8,7 @@ use std::ops::Deref;
 
 use rlox_analyzer::{compiler, parser, scanner};
 use rlox_intermediate::*;
+use rlox_runtime::VirtualMachine;
 
 fn main() {
     let mut buffer = String::new();
@@ -34,5 +35,5 @@ where
     let tokens = scanner::scan(source.deref())?;
     let declarations = parser::parse(tokens)?;
     let bytecode = compiler::compile(declarations)?;
-    Ok(())
+    VirtualMachine::new(bytecode).run()
 }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::rc::Rc;
 
 use rlox_intermediate::*;
 
@@ -134,6 +135,12 @@ impl Compiler {
                 self.compile_expression(expression)?;
                 self.chunk.append(Instruction::Print);
             }
+            Statement::Return(expression) => {
+                if let Some(expression) = expression {
+                    self.compile_expression(expression)?;
+                }
+                self.chunk.append(Instruction::Return);
+            }
             Statement::While { condition, body } => {
                 let condition_tag = self.chunk.instructions.len();
                 self.compile_expression(condition)?;
@@ -153,7 +160,6 @@ impl Compiler {
                 }
                 self.end_scope();
             }
-            _ => unimplemented!(),
         }
         Ok(())
     }
@@ -258,6 +264,8 @@ impl Compiler {
                 expression,
                 arguments,
             } => {
+                self.chunk
+                    .write(Instruction::PrepareInvoke, Default::default());
                 for argument in arguments {
                     self.compile_expression(argument)?;
                 }
@@ -350,12 +358,11 @@ pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Bytecode> {
             } => {
                 let mut compiler = Compiler::new();
                 let arity = parameters.len();
-                compiler.begin_scope();
-                compiler.predefine_parameters(parameters);
+                compiler.begin_scope(); // everything in a function is local
+                compiler.predefine_parameters(parameters); // and parameters are actually local variables
                 compiler.compile_statement(&body)?;
-                compiler.end_scope();
                 let function = Function {
-                    chunk: compiler.emit(),
+                    chunk: Rc::new(compiler.emit()),
                     arity,
                 };
                 functions.insert(name.into_inner(), function);
@@ -363,8 +370,11 @@ pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Bytecode> {
             _ => script.push(declaration),
         }
     }
-    let script = Compiler::new().compile(script)?;
-    let bytecode = Bytecode { functions, script };
+    let script = Rc::new(Compiler::new().compile(script)?);
+    let bytecode = Bytecode {
+        functions,
+        script: Rc::clone(&script),
+    };
     #[cfg(feature = "bytecode-preview")]
     {
         println!("━━━━━━━━━━ Bytecode Preview Start ━━━━━━━━━━");
@@ -373,24 +383,28 @@ pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Bytecode> {
             preview_chunk(&function.chunk);
             println!();
         }
-        println!("<entrypoint>");
-        preview_chunk(&bytecode.script);
+        if !script.is_empty() {
+            println!("<script>");
+            preview_chunk(&bytecode.script);
+        }
     }
     Ok(bytecode)
 }
 
 #[cfg(feature = "bytecode-preview")]
 fn preview_chunk(chunk: &Chunk) {
-    if !chunk.is_empty() {
-        println!("INSTRUCTIONS ({}):", chunk.len());
-        for (index, instruction) in chunk.iter().enumerate() {
-            println!("    {index:04} {instruction:?}");
-        }
-        if !chunk.constants().is_empty() {
-            println!("CONSTANTS ({}):", chunk.constants().len());
-            for (index, constant) in chunk.constants().iter().enumerate() {
-                println!("    {index:03} {constant:?}");
-            }
+    if chunk.is_empty() {
+        return;
+    }
+
+    println!("INSTRUCTIONS ({}):", chunk.len());
+    for (index, instruction) in chunk.iter().enumerate() {
+        println!("    {index:04} {instruction:?}");
+    }
+    if !chunk.constants().is_empty() {
+        println!("CONSTANTS ({}):", chunk.constants().len());
+        for (index, constant) in chunk.constants().iter().enumerate() {
+            println!("    {index:03} {constant:?}");
         }
     }
 }

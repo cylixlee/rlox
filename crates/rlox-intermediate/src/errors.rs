@@ -69,6 +69,10 @@ static ERROR_TABLE: phf::Map<&'static str, ErrorInfo> = phf_map! {
         message: "Undefined function",
         explanation: "no function matches this invocation",
     },
+    "E0016" => ErrorInfo {
+        message: "Invocation arguments mismatch",
+        explanation: "the number of arguments is not match",
+    },
 };
 
 pub fn raise(error_code: &'static str, span: Span) -> Diagnostic {

@@ -1,30 +1,44 @@
 use std::collections::HashMap;
+use std::mem;
 use std::ops::Deref;
+use std::rc::Rc;
 
 use rlox_intermediate::*;
 
-use crate::heap::Heap;
+use crate::heap::{Heap, Reference};
 use crate::stack::Stack;
 use crate::value::Value;
 
 const STACK_SIZE: usize = 1024;
 
 pub struct VirtualMachine {
-    chunk: Chunk,
+    bytecode: Bytecode,
     program_count: usize,
     stack: Stack<Value, STACK_SIZE>,
     heap: Heap,
     globals: HashMap<String, Value>,
+
+    // Invocation fields
+    chunks: Vec<Rc<Chunk>>,
+    last_program_counts: Vec<usize>,
+    stack_offsets: Vec<usize>,
+    return_value: Value,
 }
 
 impl VirtualMachine {
-    pub fn new(chunk: Chunk) -> Self {
+    pub fn new(bytecode: Bytecode) -> Self {
+        let chunk = Rc::clone(&bytecode.script);
+        let exit_program_count = chunk.len();
         Self {
-            chunk,
+            bytecode,
             program_count: 0,
             stack: Stack::new(),
             heap: Heap::new(),
             globals: HashMap::new(),
+            chunks: vec![chunk],
+            last_program_counts: vec![exit_program_count],
+            stack_offsets: vec![0],
+            return_value: Value::Nil,
         }
     }
 
@@ -32,154 +46,209 @@ impl VirtualMachine {
         #[cfg(feature = "stack-monitor")]
         println!("━━━━━━━ Stack Monitor ━━━━━━━");
 
-        while self.program_count < self.chunk.len() {
-            let instruction = &self.chunk[self.program_count];
-            let span = self.chunk.span(self.program_count).clone();
+        while !self.chunks.is_empty() {
+            while self.program_count < self.current_chunk().len() {
+                let instruction = self.current_chunk()[self.program_count].clone();
+                let span = self.current_chunk().span(self.program_count).clone();
 
-            macro_rules! binary {
-                ($variant: ident, $operator: tt) => {{
-                    let right = self.stack.pop(span.clone())?;
-                    let left = self.stack.pop(span.clone())?;
-                    if let (Value::Number(left), Value::Number(right)) = (left, right) {
-                        self.stack.push(Value::$variant(left $operator right), span)?;
-                    } else {
-                        raise!("E0008", span)
-                    }
-                }};
+                macro_rules! binary {
+                    ($variant: ident, $operator: tt) => {{
+                        let right = self.stack.pop(span.clone())?;
+                        let left = self.stack.pop(span.clone())?;
+                        if let (Value::Number(left), Value::Number(right)) = (left, right) {
+                            self.stack.push(Value::$variant(left $operator right), span)?;
+                        } else {
+                            raise!("E0008", span)
+                        }
+                    }};
 
-                (arithmetic $operator: tt) => { binary!(Number, $operator) };
-                (relational $operator: tt) => { binary!(Boolean, $operator) };
-            }
+                    (arithmetic $operator: tt) => { binary!(Number, $operator) };
+                    (relational $operator: tt) => { binary!(Boolean, $operator) };
+                }
 
-            #[cfg(feature = "stack-monitor")]
-            println!("{:04} {:?}", self.program_count, instruction);
+                #[cfg(feature = "stack-monitor")]
+                println!("{:04} {:?}", self.program_count, instruction);
 
-            match instruction {
-                Instruction::LoadConstant(index) => {
-                    let constant = self.chunk.constant(*index).clone();
-                    match constant {
-                        Constant::Number(number) => self.stack.push(Value::Number(number), span)?,
-                        Constant::String(string) => {
-                            let reference = self.heap.spawn_string(string);
-                            self.stack.push(Value::String(reference), span)?;
+                match instruction {
+                    Instruction::LoadConstant(index) => {
+                        let constant = self.current_chunk().constant(index).clone();
+                        match constant {
+                            Constant::Number(number) => {
+                                self.stack.push(Value::Number(number), span)?
+                            }
+                            Constant::String(string) => {
+                                let reference = self.heap.spawn_string(string);
+                                self.stack.push(Value::String(reference), span)?;
+                            }
                         }
                     }
-                }
-                Instruction::Add => {
-                    let right = self.stack.pop(span.clone())?;
-                    let left = self.stack.pop(span.clone())?;
-                    match (left, right) {
-                        // arithmetic addition
-                        (Value::Number(left), Value::Number(right)) => {
-                            self.stack.push(Value::Number(left + right), span)?;
+                    Instruction::Add => {
+                        let right = self.stack.pop(span.clone())?;
+                        let left = self.stack.pop(span.clone())?;
+                        match (left, right) {
+                            // arithmetic addition
+                            (Value::Number(left), Value::Number(right)) => {
+                                self.stack.push(Value::Number(left + right), span)?;
+                            }
+                            // string concatenation
+                            (Value::String(this), Value::String(that)) => {
+                                let reference = self.heap.spawn_string(format!(
+                                    "{}{}",
+                                    this.deref(),
+                                    that.deref()
+                                ));
+                                self.stack.push(Value::String(reference), span)?;
+                            }
+                            _ => raise!("E0009", span),
                         }
-                        // string concatenation
-                        (Value::String(this), Value::String(that)) => {
-                            let reference =
-                                self.heap
-                                    .spawn_string(format!("{}{}", this.deref(), that.deref()));
-                            self.stack.push(Value::String(reference), span)?;
+                    }
+                    Instruction::Subtract => binary!(arithmetic -),
+                    Instruction::Multiply => binary!(arithmetic *),
+                    Instruction::Divide => binary!(arithmetic /),
+                    Instruction::Negate => {
+                        if let Value::Number(number) = self.stack.pop(span.clone())? {
+                            self.stack.push(Value::Number(-number), span)?;
+                        } else {
+                            raise!("E0008", span);
                         }
-                        _ => raise!("E0009", span),
                     }
-                }
-                Instruction::Subtract => binary!(arithmetic -),
-                Instruction::Multiply => binary!(arithmetic *),
-                Instruction::Divide => binary!(arithmetic /),
-                Instruction::Negate => {
-                    if let Value::Number(number) = self.stack.pop(span.clone())? {
-                        self.stack.push(Value::Number(-number), span)?;
-                    } else {
-                        raise!("E0008", span);
+                    Instruction::Not => {
+                        let value: bool = self.stack.pop(span.clone())?.boolean();
+                        self.stack.push(Value::Boolean(!value), span)?;
                     }
-                }
-                Instruction::Not => {
-                    let value: bool = self.stack.pop(span.clone())?.boolean();
-                    self.stack.push(Value::Boolean(!value), span)?;
-                }
-                Instruction::Greater => binary!(relational >),
-                Instruction::Less => binary!(relational <),
-                Instruction::Equal => {
-                    let right = self.stack.pop(span.clone())?;
-                    let left = self.stack.pop(span.clone())?;
-                    self.stack.push(Value::Boolean(left == right), span)?;
-                }
-                Instruction::True => self.stack.push(Value::Boolean(true), span)?,
-                Instruction::False => self.stack.push(Value::Boolean(false), span)?,
-                Instruction::Nil => self.stack.push(Value::Nil, span)?,
-                Instruction::Print => {
-                    let value = self.stack.pop(span)?;
-                    println!("{value}");
-                }
-                Instruction::Pop => {
-                    self.stack.pop(span)?;
-                }
-                Instruction::DefineGlobal => {
-                    let name = match self.stack.pop(span.clone())? {
-                        Value::String(identifier) => identifier,
-                        _ => raise!("E0010", span),
-                    };
-                    let value = self.stack.pop(span.clone())?;
-                    if self.globals.contains_key(name.deref()) {
-                        raise!("E0011", span);
+                    Instruction::Greater => binary!(relational >),
+                    Instruction::Less => binary!(relational <),
+                    Instruction::Equal => {
+                        let right = self.stack.pop(span.clone())?;
+                        let left = self.stack.pop(span.clone())?;
+                        self.stack.push(Value::Boolean(left == right), span)?;
                     }
-                    self.globals.insert(name.deref().clone(), value);
-                }
-                Instruction::GetGlobal => {
-                    let name = match self.stack.pop(span.clone())? {
-                        Value::String(identifier) => identifier,
-                        _ => raise!("E0010", span),
-                    };
-                    if let Some(value) = self.globals.get(name.deref()) {
-                        self.stack.push(value.clone(), span)?;
-                    } else {
-                        raise!("E0012", span);
+                    Instruction::True => self.stack.push(Value::Boolean(true), span)?,
+                    Instruction::False => self.stack.push(Value::Boolean(false), span)?,
+                    Instruction::Nil => self.stack.push(Value::Nil, span)?,
+                    Instruction::Print => {
+                        let value = self.stack.pop(span)?;
+                        println!("{value}");
                     }
-                }
-                Instruction::SetGlobal => {
-                    let name = match self.stack.pop(span.clone())? {
-                        Value::String(identifier) => identifier,
-                        _ => raise!("E0010", span),
-                    };
-                    let value = self.stack.top(span.clone())?.clone();
-                    if let Some(variable) = self.globals.get_mut(name.deref()) {
-                        *variable = value;
-                    } else {
-                        raise!("E0012", span);
+                    Instruction::Pop => {
+                        self.stack.pop(span)?;
                     }
-                }
-                Instruction::GetLocal(index) => {
-                    self.stack.push(self.stack[*index].clone(), span)?
-                }
-                Instruction::SetLocal(index) => {
-                    let value = self.stack.top(span)?.clone();
-                    self.stack[*index] = value;
-                }
-                Instruction::JumpIfFalse(offset) => {
-                    let condition: bool = self.stack.top(span)?.boolean();
-                    if !condition {
+                    Instruction::DefineGlobal => {
+                        let name = self.pop_identifier(span.clone())?;
+                        let value = self.stack.pop(span.clone())?;
+                        if self.globals.contains_key(name.deref()) {
+                            raise!("E0011", span);
+                        }
+                        self.globals.insert(name.deref().clone(), value);
+                    }
+                    Instruction::GetGlobal => {
+                        let name = self.pop_identifier(span.clone())?;
+                        self.stack
+                            .push(self.global_ref(name, span.clone())?.clone(), span)?;
+                    }
+                    Instruction::SetGlobal => {
+                        let name = self.pop_identifier(span.clone())?;
+                        let value = self.stack.top(span.clone())?.clone();
+                        *self.global_mut(name, span)? = value;
+                    }
+                    Instruction::GetLocal(index) => {
+                        let stack_offset = self.current_stack_offset();
+                        self.stack
+                            .push(self.stack[stack_offset + index].clone(), span)?;
+                    }
+                    Instruction::SetLocal(index) => {
+                        let value = self.stack.top(span)?.clone();
+                        let stack_offset = self.current_stack_offset();
+                        self.stack[stack_offset + index] = value;
+                    }
+                    Instruction::JumpIfFalse(offset) => {
+                        let condition: bool = self.stack.top(span)?.boolean();
+                        if !condition {
+                            self.program_count = (self.program_count as isize + offset) as usize;
+                            continue;
+                        }
+                    }
+                    Instruction::Jump(offset) => {
                         self.program_count = (self.program_count as isize + offset) as usize;
-                        continue;
+                    }
+                    Instruction::PrepareInvoke => self.stack_offsets.push(self.stack.len()),
+                    Instruction::Invoke => {
+                        let name = self.pop_identifier(span.clone())?;
+                        let function = match self.bytecode.functions.get(&*name) {
+                            Some(function) => function,
+                            None => raise!("E0015", span),
+                        };
+                        let argument_count = self.stack.len() - self.current_stack_offset();
+                        if argument_count != function.arity {
+                            raise! {
+                                "E0016", span,
+                                format!(
+                                    "expected {} arguments, found {}",
+                                    function.arity, argument_count
+                                )
+                            }
+                        }
+                        self.last_program_counts.push(self.program_count + 1);
+                        self.program_count = 0;
+                        self.chunks.push(Rc::clone(&function.chunk));
+                        self.return_value = Value::Nil;
+                    }
+                    Instruction::Return => {
+                        self.return_value = self.stack.pop(span)?;
                     }
                 }
-                Instruction::Jump(offset) => {
-                    self.program_count = (self.program_count as isize + offset) as usize;
-                    continue;
+
+                #[cfg(feature = "stack-monitor")]
+                if !self.stack.is_empty() {
+                    println!("{:?}", self.stack);
                 }
-                Instruction::Invoke => unimplemented!(),
+
+                self.program_count += 1;
             }
 
-            #[cfg(feature = "stack-monitor")]
-            if !self.stack.is_empty() {
-                println!("{:?}", self.stack);
+            let stack_offset = self.stack_offsets.pop().unwrap();
+            while self.stack.len() > stack_offset {
+                self.stack.try_pop().unwrap();
             }
-
-            self.program_count += 1;
+            self.stack
+                .try_push(mem::replace(&mut self.return_value, Value::Nil));
+            let last_program_count = self.last_program_counts.pop().unwrap();
+            self.program_count = last_program_count;
+            self.chunks.pop().unwrap();
         }
 
         #[cfg(feature = "stack-monitor")]
         println!();
 
         Ok(())
+    }
+
+    fn current_chunk(&self) -> &Chunk {
+        self.chunks.last().unwrap()
+    }
+
+    fn current_stack_offset(&self) -> usize {
+        *self.stack_offsets.last().unwrap()
+    }
+
+    fn pop_identifier(&mut self, span: Span) -> DiagnosableResult<Reference<String>> {
+        match self.stack.pop(span.clone())? {
+            Value::String(identifier) => Ok(identifier),
+            _ => raise!("E0010", span),
+        }
+    }
+
+    fn global_ref(&self, name: impl AsRef<str>, span: Span) -> DiagnosableResult<&Value> {
+        if let Some(value) = self.globals.get(name.as_ref()) {
+            return Ok(value);
+        }
+        raise!("E0012", span);
+    }
+
+    fn global_mut(&mut self, name: impl AsRef<str>, span: Span) -> DiagnosableResult<&mut Value> {
+        if let Some(value) = self.globals.get_mut(name.as_ref()) {
+            return Ok(value);
+        }
+        raise!("E0012", span);
     }
 }

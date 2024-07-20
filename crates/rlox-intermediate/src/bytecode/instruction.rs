@@ -35,5 +35,7 @@ pub enum Instruction {
     /* Control flow */
     JumpIfFalse(isize),
     Jump(isize),
+    PrepareInvoke,
     Invoke,
+    Return,
 }

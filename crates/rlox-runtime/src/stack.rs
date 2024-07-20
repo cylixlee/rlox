@@ -38,13 +38,20 @@ impl<T, const N: usize> Stack<T, N> {
         raise!("E0007", span)
     }
 
-    pub fn push(&mut self, element: T, span: Span) -> DiagnosableResult {
+    pub fn try_push(&mut self, element: T) -> bool {
         if self.top < N {
             self.data[self.top] = MaybeUninit::new(element);
             self.top += 1;
-            return Ok(());
+            return true;
         }
-        raise!("E0006", span)
+        false
+    }
+
+    pub fn push(&mut self, element: T, span: Span) -> DiagnosableResult {
+        if !self.try_push(element) {
+            raise!("E0006", span)
+        }
+        Ok(())
     }
 
     pub fn try_pop(&mut self) -> Option<T> {
