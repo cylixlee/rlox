@@ -88,8 +88,8 @@ impl Compiler {
                 let incrementer_tag = self.chunk.instructions.len();
                 if let Some(incrementer) = incrementer {
                     self.compile_expression(incrementer)?;
+                    self.chunk.append(Instruction::Pop);
                 }
-                self.chunk.append(Instruction::Pop);
                 self.chunk
                     .append_backpatch(Instruction::Jump(0))
                     .backpatch_by(condition_tag as isize);
