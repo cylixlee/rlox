@@ -2,30 +2,44 @@ use std::ops::Deref;
 
 use rlox_intermediate::*;
 
-struct Compiler {
-    offset: usize,
-    chunk: ChunkBuilder,
-    locals: Vec<String>,
-    blocks: Vec<usize>,
+enum FunctionType {
+    Function,
+    Script,
 }
 
-impl Compiler {
-    fn new() -> Self {
+struct Compiler<'a> {
+    offset: usize,
+    locals: Vec<String>,
+    blocks: Vec<usize>,
+    functions: Vec<FunctionBuilder>,
+    function_type: FunctionType,
+
+    heap: &'a mut Heap,
+}
+
+impl<'a> Compiler<'a> {
+    fn new(heap: &'a mut Heap) -> Self {
         Self {
             offset: 0,
-            chunk: ChunkBuilder::new(),
             locals: Vec::new(),
             blocks: Vec::new(),
+            functions: vec![FunctionBuilder::new()],
+            function_type: FunctionType::Script,
+            heap,
         }
     }
 
-    fn compile(mut self, program: Vec<Declaration>) -> DiagnosableResult<Chunk> {
-        while self.offset < program.len() {
-            self.compile_declaration(&program[self.offset])?;
-            self.offset += 1;
-        }
-        Ok(self.chunk.build())
+    fn current_function(&mut self) -> &mut FunctionBuilder {
+        self.functions.last_mut().unwrap()
     }
+
+    // fn compile(mut self, program: Vec<Declaration>) -> DiagnosableResult<Chunk> {
+    //     while self.offset < program.len() {
+    //         self.compile_declaration(&program[self.offset])?;
+    //         self.offset += 1;
+    //     }
+    //     Ok(self.current_function().build())
+    // }
 
     fn compile_declaration(&mut self, declaration: &Declaration) -> DiagnosableResult {
         match declaration {
@@ -34,15 +48,17 @@ impl Compiler {
                 if let Some(initializer) = initializer {
                     self.compile_expression(initializer)?;
                 } else {
-                    self.chunk.write(Instruction::Nil, name.span.clone());
+                    self.current_function()
+                        .write(Instruction::Nil, name.span.clone());
                 }
                 // determine whether it is global or local
                 if self.blocks.is_empty() {
                     // load global variable name (identifier)
-                    let index = self.chunk.define(Constant::String(name.deref().clone()));
-                    self.chunk
+                    let identifier = self.heap.spawn_string(name.deref().clone());
+                    let index = self.current_function().define(Value::String(identifier));
+                    self.current_function()
                         .write(Instruction::LoadConstant(index), name.span.clone());
-                    self.chunk.append(Instruction::DefineGlobal);
+                    self.current_function().append(Instruction::DefineGlobal);
                 } else {
                     // there's no need to generate SetLocal.
                     // local variables are defined once initializer expression calculated.
@@ -59,7 +75,7 @@ impl Compiler {
         match statement {
             Statement::Expression(expression) => {
                 self.compile_expression(expression)?;
-                self.chunk.append(Instruction::Pop);
+                self.current_function().append(Instruction::Pop);
             }
             Statement::For {
                 initializer,
@@ -78,28 +94,32 @@ impl Compiler {
                         }
                     }
                 }
-                let condition_tag = self.chunk.instructions.len();
+                let condition_tag = self.current_function().instructions.len();
                 if let Some(condition) = condition {
                     self.compile_expression(condition)?;
                 }
-                let mut outer_backpatch = self.chunk.append_backpatch(Instruction::JumpIfFalse(0));
-                self.chunk.append(Instruction::Pop);
-                let mut body_backpatch = self.chunk.append_backpatch(Instruction::Jump(0));
-                let incrementer_tag = self.chunk.instructions.len();
+                let mut outer_backpatch = self
+                    .current_function()
+                    .append_backpatch(Instruction::JumpIfFalse(0));
+                self.current_function().append(Instruction::Pop);
+                let mut body_backpatch = self
+                    .current_function()
+                    .append_backpatch(Instruction::Jump(0));
+                let incrementer_tag = self.current_function().instructions.len();
                 if let Some(incrementer) = incrementer {
                     self.compile_expression(incrementer)?;
-                    self.chunk.append(Instruction::Pop);
+                    self.current_function().append(Instruction::Pop);
                 }
-                self.chunk
+                self.current_function()
                     .append_backpatch(Instruction::Jump(0))
                     .backpatch_by(condition_tag as isize);
                 body_backpatch.backpatch();
                 self.compile_statement(body)?;
-                self.chunk
+                self.current_function()
                     .append_backpatch(Instruction::Jump(0))
                     .backpatch_by(incrementer_tag as isize);
                 outer_backpatch.backpatch();
-                self.chunk.append(Instruction::Pop);
+                self.current_function().append(Instruction::Pop);
                 self.end_scope();
             }
             Statement::If {
@@ -108,12 +128,16 @@ impl Compiler {
                 otherwise,
             } => {
                 self.compile_expression(condition)?;
-                let mut else_backpatch = self.chunk.append_backpatch(Instruction::JumpIfFalse(0));
-                self.chunk.append(Instruction::Pop);
+                let mut else_backpatch = self
+                    .current_function()
+                    .append_backpatch(Instruction::JumpIfFalse(0));
+                self.current_function().append(Instruction::Pop);
                 self.compile_statement(then)?;
-                let mut outer_backpatch = self.chunk.append_backpatch(Instruction::Jump(0));
+                let mut outer_backpatch = self
+                    .current_function()
+                    .append_backpatch(Instruction::Jump(0));
                 else_backpatch.backpatch();
-                self.chunk.append(Instruction::Pop);
+                self.current_function().append(Instruction::Pop);
                 if let Some(otherwise) = otherwise {
                     self.compile_statement(otherwise)?;
                 }
@@ -121,19 +145,21 @@ impl Compiler {
             }
             Statement::Print(expression) => {
                 self.compile_expression(expression)?;
-                self.chunk.append(Instruction::Print);
+                self.current_function().append(Instruction::Print);
             }
             Statement::While { condition, body } => {
-                let condition_tag = self.chunk.instructions.len();
+                let condition_tag = self.current_function().instructions.len();
                 self.compile_expression(condition)?;
-                let mut outer_backpatch = self.chunk.append_backpatch(Instruction::JumpIfFalse(0));
-                self.chunk.append(Instruction::Pop);
+                let mut outer_backpatch = self
+                    .current_function()
+                    .append_backpatch(Instruction::JumpIfFalse(0));
+                self.current_function().append(Instruction::Pop);
                 self.compile_statement(body)?;
-                self.chunk
+                self.current_function()
                     .append_backpatch(Instruction::Jump(0))
                     .backpatch_by(condition_tag as isize);
                 outer_backpatch.backpatch();
-                self.chunk.append(Instruction::Pop);
+                self.current_function().append(Instruction::Pop);
             }
             Statement::Block(declarations) => {
                 self.begin_scope();
@@ -159,15 +185,17 @@ impl Compiler {
                             match self.search_local(identifier) {
                                 None => {
                                     // load global variable name (identifier)
-                                    let index =
-                                        self.chunk.define(Constant::String(identifier.clone()));
-                                    self.chunk.write(
+                                    let name = self.heap.spawn_string(identifier.clone());
+                                    let index = self.current_function().define(Value::String(name));
+                                    self.current_function().write(
                                         Instruction::LoadConstant(index),
                                         literal.span.clone(),
                                     );
-                                    self.chunk.append(Instruction::SetGlobal);
+                                    self.current_function().append(Instruction::SetGlobal);
                                 }
-                                Some(index) => self.chunk.append(Instruction::SetLocal(index)),
+                                Some(index) => {
+                                    self.current_function().append(Instruction::SetLocal(index))
+                                }
                             }
                         }
                         _ => raise!("E0013", literal.span.clone()),
@@ -184,19 +212,23 @@ impl Compiler {
                 match operator.deref() {
                     BinaryOperator::And => {
                         self.compile_expression(left)?;
-                        let mut outer_backpatch =
-                            self.chunk.append_backpatch(Instruction::JumpIfFalse(0));
-                        self.chunk.append(Instruction::Pop);
+                        let mut outer_backpatch = self
+                            .current_function()
+                            .append_backpatch(Instruction::JumpIfFalse(0));
+                        self.current_function().append(Instruction::Pop);
                         self.compile_expression(right)?;
                         outer_backpatch.backpatch();
                     }
                     BinaryOperator::Or => {
                         self.compile_expression(left)?;
-                        let mut right_backpatch =
-                            self.chunk.append_backpatch(Instruction::JumpIfFalse(0));
-                        let mut outer_backpatch = self.chunk.append_backpatch(Instruction::Jump(0));
+                        let mut right_backpatch = self
+                            .current_function()
+                            .append_backpatch(Instruction::JumpIfFalse(0));
+                        let mut outer_backpatch = self
+                            .current_function()
+                            .append_backpatch(Instruction::Jump(0));
                         right_backpatch.backpatch();
-                        self.chunk.append(Instruction::Pop);
+                        self.current_function().append(Instruction::Pop);
                         self.compile_expression(right)?;
                         outer_backpatch.backpatch();
                     }
@@ -204,28 +236,38 @@ impl Compiler {
                         self.compile_expression(left)?;
                         self.compile_expression(right)?;
                         match operator.deref() {
-                            BinaryOperator::Add => self.chunk.write(Instruction::Add, span),
+                            BinaryOperator::Add => {
+                                self.current_function().write(Instruction::Add, span)
+                            }
                             BinaryOperator::Subtract => {
-                                self.chunk.write(Instruction::Subtract, span)
+                                self.current_function().write(Instruction::Subtract, span)
                             }
                             BinaryOperator::Multiply => {
-                                self.chunk.write(Instruction::Multiply, span)
+                                self.current_function().write(Instruction::Multiply, span)
                             }
-                            BinaryOperator::Divide => self.chunk.write(Instruction::Divide, span),
-                            BinaryOperator::Equal => self.chunk.write(Instruction::Equal, span),
-                            BinaryOperator::Greater => self.chunk.write(Instruction::Greater, span),
-                            BinaryOperator::Less => self.chunk.write(Instruction::Less, span),
+                            BinaryOperator::Divide => {
+                                self.current_function().write(Instruction::Divide, span)
+                            }
+                            BinaryOperator::Equal => {
+                                self.current_function().write(Instruction::Equal, span)
+                            }
+                            BinaryOperator::Greater => {
+                                self.current_function().write(Instruction::Greater, span)
+                            }
+                            BinaryOperator::Less => {
+                                self.current_function().write(Instruction::Less, span)
+                            }
                             BinaryOperator::NotEqual => {
-                                self.chunk.write(Instruction::Equal, span);
-                                self.chunk.append(Instruction::Not);
+                                self.current_function().write(Instruction::Equal, span);
+                                self.current_function().append(Instruction::Not);
                             }
                             BinaryOperator::GreaterEqual => {
-                                self.chunk.write(Instruction::Less, span);
-                                self.chunk.append(Instruction::Not);
+                                self.current_function().write(Instruction::Less, span);
+                                self.current_function().append(Instruction::Not);
                             }
                             BinaryOperator::LessEqual => {
-                                self.chunk.write(Instruction::Greater, span);
-                                self.chunk.append(Instruction::Not);
+                                self.current_function().write(Instruction::Greater, span);
+                                self.current_function().append(Instruction::Not);
                             }
                             _ => unimplemented!(),
                         }
@@ -239,27 +281,34 @@ impl Compiler {
                 self.compile_expression(expression)?;
                 let span = operator.span.clone();
                 match operator.deref() {
-                    UnaryOperator::Not => self.chunk.write(Instruction::Not, span),
-                    UnaryOperator::Negate => self.chunk.write(Instruction::Negate, span),
+                    UnaryOperator::Not => self.current_function().write(Instruction::Not, span),
+                    UnaryOperator::Negate => {
+                        self.current_function().write(Instruction::Negate, span)
+                    }
                 }
             }
             Expression::Literal(literal) => match literal.deref() {
-                Literal::Nil => self.chunk.write(Instruction::Nil, literal.span.clone()),
+                Literal::Nil => self
+                    .current_function()
+                    .write(Instruction::Nil, literal.span.clone()),
                 Literal::Boolean(boolean) => {
                     if *boolean {
-                        self.chunk.write(Instruction::True, literal.span.clone());
+                        self.current_function()
+                            .write(Instruction::True, literal.span.clone());
                     } else {
-                        self.chunk.write(Instruction::False, literal.span.clone());
+                        self.current_function()
+                            .write(Instruction::False, literal.span.clone());
                     }
                 }
                 Literal::Number(number) => {
-                    let index = self.chunk.define(Constant::Number(*number));
-                    self.chunk
+                    let index = self.current_function().define(Value::Number(*number));
+                    self.current_function()
                         .write(Instruction::LoadConstant(index), literal.span.clone());
                 }
                 Literal::String(string) => {
-                    let index = self.chunk.define(Constant::String(string.clone()));
-                    self.chunk
+                    let string = self.heap.spawn_string(string.clone());
+                    let index = self.current_function().define(Value::String(string));
+                    self.current_function()
                         .write(Instruction::LoadConstant(index), literal.span.clone());
                 }
                 Literal::Identifier(identifier) => {
@@ -267,12 +316,13 @@ impl Compiler {
                     match self.search_local(identifier) {
                         None => {
                             // load global variable name (identifier)
-                            let index = self.chunk.define(Constant::String(identifier.clone()));
-                            self.chunk
+                            let name = self.heap.spawn_string(identifier.clone());
+                            let index = self.current_function().define(Value::String(name));
+                            self.current_function()
                                 .write(Instruction::LoadConstant(index), literal.span.clone());
-                            self.chunk.append(Instruction::GetGlobal);
+                            self.current_function().append(Instruction::GetGlobal);
                         }
-                        Some(index) => self.chunk.append(Instruction::GetLocal(index)),
+                        Some(index) => self.current_function().append(Instruction::GetLocal(index)),
                     }
                 }
                 _ => unimplemented!(),
@@ -301,24 +351,25 @@ impl Compiler {
         let frame = self.blocks.pop().unwrap();
         while self.locals.len() > frame {
             self.locals.pop();
-            self.chunk.append(Instruction::Pop);
+            self.current_function().append(Instruction::Pop);
         }
     }
 }
 
 pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Chunk> {
-    let chunk = Compiler::new().compile(program)?;
-    #[cfg(feature = "bytecode-preview")]
-    {
-        println!("━━━━━━━ Instructions ━━━━━━━━");
-        for (index, instruction) in chunk.iter().enumerate() {
-            println!("{index:04} {instruction:?}");
-        }
-
-        println!("━━━━━━━━━ Constants ━━━━━━━━━");
-        for (index, constant) in chunk.constants().iter().enumerate() {
-            println!("{index:03}  {constant:?}");
-        }
-    }
-    Ok(chunk)
+    // let chunk = Compiler::new().compile(program)?;
+    // #[cfg(feature = "bytecode-preview")]
+    // {
+    //     println!("━━━━━━━ Instructions ━━━━━━━━");
+    //     for (index, instruction) in chunk.iter().enumerate() {
+    //         println!("{index:04} {instruction:?}");
+    //     }
+    //
+    //     println!("━━━━━━━━━ Constants ━━━━━━━━━");
+    //     for (index, constant) in chunk.constants().iter().enumerate() {
+    //         println!("{index:03}  {constant:?}");
+    //     }
+    // }
+    // Ok(chunk)
+    unimplemented!()
 }

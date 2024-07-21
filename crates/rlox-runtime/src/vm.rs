@@ -1,18 +1,16 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
+use smallvec::SmallVec;
+
 use rlox_intermediate::*;
 
-use crate::heap::Heap;
-use crate::stack::Stack;
-use crate::value::Value;
-
-const STACK_SIZE: usize = 1024;
+const STACK_SIZE: usize = 4 * 1024;
 
 pub struct VirtualMachine {
     chunk: Chunk,
     program_count: usize,
-    stack: Stack<Value, STACK_SIZE>,
+    stack: SmallVec<[Value; STACK_SIZE]>,
     heap: Heap,
     globals: HashMap<String, Value>,
 }
@@ -22,7 +20,7 @@ impl VirtualMachine {
         Self {
             chunk,
             program_count: 0,
-            stack: Stack::new(),
+            stack: SmallVec::new(),
             heap: Heap::new(),
             globals: HashMap::new(),
         }
@@ -38,10 +36,10 @@ impl VirtualMachine {
 
             macro_rules! binary {
                 ($variant: ident, $operator: tt) => {{
-                    let right = self.stack.pop(span.clone())?;
-                    let left = self.stack.pop(span.clone())?;
+                    let right = self.stack.pop().unwrap();
+                    let left = self.stack.pop().unwrap();
                     if let (Value::Number(left), Value::Number(right)) = (left, right) {
-                        self.stack.push(Value::$variant(left $operator right), span)?;
+                        self.stack.push(Value::$variant(left $operator right));
                     } else {
                         raise!("E0008", span)
                     }
@@ -56,29 +54,29 @@ impl VirtualMachine {
 
             match instruction {
                 Instruction::LoadConstant(index) => {
-                    let constant = self.chunk.constant(*index).clone();
-                    match constant {
-                        Constant::Number(number) => self.stack.push(Value::Number(number), span)?,
-                        Constant::String(string) => {
-                            let reference = self.heap.spawn_string(string);
-                            self.stack.push(Value::String(reference), span)?;
+                    let value = self.chunk.constant(*index).clone();
+                    match value {
+                        Value::String(string) => {
+                            let reference = self.heap.spawn_string(string.deref().clone());
+                            self.stack.push(Value::String(reference));
                         }
+                        _ => self.stack.push(value),
                     }
                 }
                 Instruction::Add => {
-                    let right = self.stack.pop(span.clone())?;
-                    let left = self.stack.pop(span.clone())?;
+                    let right = self.stack.pop().unwrap();
+                    let left = self.stack.pop().unwrap();
                     match (left, right) {
                         // arithmetic addition
                         (Value::Number(left), Value::Number(right)) => {
-                            self.stack.push(Value::Number(left + right), span)?;
+                            self.stack.push(Value::Number(left + right));
                         }
                         // string concatenation
                         (Value::String(this), Value::String(that)) => {
                             let reference =
                                 self.heap
                                     .spawn_string(format!("{}{}", this.deref(), that.deref()));
-                            self.stack.push(Value::String(reference), span)?;
+                            self.stack.push(Value::String(reference));
                         }
                         _ => raise!("E0009", span),
                     }
@@ -87,76 +85,74 @@ impl VirtualMachine {
                 Instruction::Multiply => binary!(arithmetic *),
                 Instruction::Divide => binary!(arithmetic /),
                 Instruction::Negate => {
-                    if let Value::Number(number) = self.stack.pop(span.clone())? {
-                        self.stack.push(Value::Number(-number), span)?;
+                    if let Value::Number(number) = self.stack.pop().unwrap() {
+                        self.stack.push(Value::Number(-number));
                     } else {
                         raise!("E0008", span);
                     }
                 }
                 Instruction::Not => {
-                    let value: bool = self.stack.pop(span.clone())?.boolean();
-                    self.stack.push(Value::Boolean(!value), span)?;
+                    let value: bool = self.stack.pop().unwrap().boolean();
+                    self.stack.push(Value::Boolean(!value));
                 }
                 Instruction::Greater => binary!(relational >),
                 Instruction::Less => binary!(relational <),
                 Instruction::Equal => {
-                    let right = self.stack.pop(span.clone())?;
-                    let left = self.stack.pop(span.clone())?;
-                    self.stack.push(Value::Boolean(left == right), span)?;
+                    let right = self.stack.pop().unwrap();
+                    let left = self.stack.pop().unwrap();
+                    self.stack.push(Value::Boolean(left == right));
                 }
-                Instruction::True => self.stack.push(Value::Boolean(true), span)?,
-                Instruction::False => self.stack.push(Value::Boolean(false), span)?,
-                Instruction::Nil => self.stack.push(Value::Nil, span)?,
+                Instruction::True => self.stack.push(Value::Boolean(true)),
+                Instruction::False => self.stack.push(Value::Boolean(false)),
+                Instruction::Nil => self.stack.push(Value::Nil),
                 Instruction::Print => {
-                    let value = self.stack.pop(span)?;
+                    let value = self.stack.pop().unwrap();
                     println!("{value}");
                 }
                 Instruction::Pop => {
-                    self.stack.pop(span)?;
+                    self.stack.pop().unwrap();
                 }
                 Instruction::DefineGlobal => {
-                    let name = match self.stack.pop(span.clone())? {
+                    let name = match self.stack.pop().unwrap() {
                         Value::String(identifier) => identifier,
                         _ => raise!("E0010", span),
                     };
-                    let value = self.stack.pop(span.clone())?;
+                    let value = self.stack.pop().unwrap();
                     if self.globals.contains_key(name.deref()) {
                         raise!("E0011", span);
                     }
                     self.globals.insert(name.deref().clone(), value);
                 }
                 Instruction::GetGlobal => {
-                    let name = match self.stack.pop(span.clone())? {
+                    let name = match self.stack.pop().unwrap() {
                         Value::String(identifier) => identifier,
                         _ => raise!("E0010", span),
                     };
                     if let Some(value) = self.globals.get(name.deref()) {
-                        self.stack.push(value.clone(), span)?;
+                        self.stack.push(value.clone());
                     } else {
                         raise!("E0012", span);
                     }
                 }
                 Instruction::SetGlobal => {
-                    let name = match self.stack.pop(span.clone())? {
+                    let name = match self.stack.pop().unwrap() {
                         Value::String(identifier) => identifier,
                         _ => raise!("E0010", span),
                     };
-                    let value = self.stack.top(span.clone())?.clone();
+                    let value = self.stack.last().unwrap().clone();
                     if let Some(variable) = self.globals.get_mut(name.deref()) {
                         *variable = value;
                     } else {
                         raise!("E0012", span);
                     }
                 }
-                Instruction::GetLocal(index) => {
-                    self.stack.push(self.stack[*index].clone(), span)?
-                }
+                Instruction::GetLocal(index) => self.stack.push(self.stack[*index].clone()),
                 Instruction::SetLocal(index) => {
-                    let value = self.stack.top(span)?.clone();
+                    let value = self.stack.last().unwrap().clone();
                     self.stack[*index] = value;
                 }
                 Instruction::JumpIfFalse(offset) => {
-                    let condition: bool = self.stack.top(span)?.boolean();
+                    let condition: bool = self.stack.last().unwrap().boolean();
                     if !condition {
                         self.program_count = (self.program_count as isize + offset) as usize;
                         continue;

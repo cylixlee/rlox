@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-pub use reference::*;
-
-mod reference;
+use crate::Reference;
 
 pub struct Heap {
     allocated: Vec<Reference<()>>,

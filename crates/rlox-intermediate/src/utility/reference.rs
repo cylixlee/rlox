@@ -1,25 +1,25 @@
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::ptr;
 use std::ptr::NonNull;
 
-#[derive(Eq, PartialEq)]
 pub struct Reference<T> {
     pointer: NonNull<dyn Any>,
     _marker: PhantomData<T>,
 }
 
 impl<T: 'static> Reference<T> {
-    pub(super) unsafe fn new(pointer: *mut T) -> Self {
+    pub unsafe fn new(pointer: *mut T) -> Self {
         Self {
             pointer: NonNull::new_unchecked(pointer as *mut dyn Any),
             _marker: PhantomData,
         }
     }
 
-    pub(super) unsafe fn finalize(&mut self) {
+    pub unsafe fn finalize(&mut self) {
         ptr::drop_in_place(self.pointer.as_mut())
     }
 
@@ -59,6 +59,20 @@ impl<T> Deref for Reference<T> {
 impl<T> DerefMut for Reference<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.pointer.cast().as_mut() }
+    }
+}
+
+impl<T, U> PartialEq<Reference<U>> for Reference<T> {
+    fn eq(&self, other: &Reference<U>) -> bool {
+        ptr::eq(self.pointer.as_ptr(), other.pointer.as_ptr())
+    }
+}
+
+impl<T> Eq for Reference<T> {}
+
+impl<T> Hash for Reference<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.pointer.hash(state)
     }
 }
 

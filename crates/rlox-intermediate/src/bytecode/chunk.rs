@@ -1,44 +1,14 @@
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
-use std::mem;
 use std::ops::Deref;
 
-use crate::{Instruction, Span};
+use crate::{Instruction, Span, Value};
 use crate::bytecode::backpatcher::{Backpatch, JumpBackpatcher, JumpIfFalseBackpatcher};
-
-#[derive(Debug, Clone)]
-pub enum Constant {
-    Number(f64),
-    String(String),
-}
-
-impl PartialEq for Constant {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Constant::Number(this), Constant::Number(that)) => (this - that).abs() < f64::EPSILON,
-            (Constant::String(this), Constant::String(that)) => this == that,
-            _ => false,
-        }
-    }
-}
-
-impl Eq for Constant {}
-
-impl Hash for Constant {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        mem::discriminant(self).hash(state);
-        match self {
-            Constant::Number(number) => number.to_bits().hash(state),
-            Constant::String(string) => string.hash(state),
-        }
-    }
-}
 
 pub struct ChunkBuilder {
     pub instructions: Vec<Instruction>,
     pub spans: Vec<Span>,
-    pub constants: Vec<Constant>,
-    constants_cache: HashMap<Constant, usize>,
+    pub constants: Vec<Value>,
+    constants_cache: HashMap<Value, usize>,
 }
 
 impl ChunkBuilder {
@@ -81,7 +51,7 @@ impl ChunkBuilder {
         self.write(instruction, span);
     }
 
-    pub fn define(&mut self, constant: Constant) -> usize {
+    pub fn define(&mut self, constant: Value) -> usize {
         if let Some(index) = self.constants_cache.get(&constant) {
             return *index;
         }
@@ -95,7 +65,7 @@ impl ChunkBuilder {
 pub struct Chunk {
     instructions: Vec<Instruction>,
     spans: Vec<Span>,
-    constants: Vec<Constant>,
+    constants: Vec<Value>,
 }
 
 impl Chunk {
@@ -107,7 +77,7 @@ impl Chunk {
         &self.spans
     }
 
-    pub fn constants(&self) -> &Vec<Constant> {
+    pub fn constants(&self) -> &Vec<Value> {
         &self.constants
     }
 
@@ -115,7 +85,7 @@ impl Chunk {
         &self.spans[index]
     }
 
-    pub fn constant(&self, index: usize) -> &Constant {
+    pub fn constant(&self, index: usize) -> &Value {
         &self.constants[index]
     }
 }
