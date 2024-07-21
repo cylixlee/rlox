@@ -16,4 +16,4 @@ mod utility;
 // Thus, the [`FileId`] is unit type because there's no need for an id;
 type FileId = ();
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<FileId>;
-pub type DiagnosableResult<T = ()> = Result<T, Diagnostic>;
+pub type DiagnosableResult<T = ()> = Result<T, Box<Diagnostic>>;

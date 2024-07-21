@@ -11,6 +11,7 @@ lto = true
 panic = "abort"
 
 [dependencies]
+mimalloc = "0.1.43"
 rlox-analyzer = { path = "crates/rlox-analyzer" }
 rlox-intermediate = { path = "crates/rlox-intermediate" }
 rlox-runtime = { path = "crates/rlox-runtime" }

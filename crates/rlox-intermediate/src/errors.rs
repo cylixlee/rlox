@@ -74,10 +74,10 @@ pub fn raise(error_code: &'static str, span: Span) -> Diagnostic {
 #[macro_export]
 macro_rules! raise {
     ($error_code: expr, $span: expr) => {
-        return Err($crate::errors::raise($error_code, $span))
+        return Err(Box::new($crate::errors::raise($error_code, $span)))
     };
 
     ($error_code: expr, $span: expr, $($notes: expr), + $(,)?) => {
-        return Err($crate::errors::raise($error_code, $span).with_notes(vec![$($notes), +]))
+        return Err(Box::new($crate::errors::raise($error_code, $span).with_notes(vec![$($notes), +])))
     };
 }

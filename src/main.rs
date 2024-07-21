@@ -6,9 +6,14 @@ use std::io;
 use std::io::Write;
 use std::ops::Deref;
 
+use mimalloc::MiMalloc;
+
 use rlox_analyzer::{compiler, parser, scanner};
 use rlox_intermediate::*;
 use rlox_runtime::VirtualMachine;
+
+#[global_allocator]
+static ALLOCATOR: MiMalloc = MiMalloc;
 
 fn main() {
     let mut buffer = String::new();
