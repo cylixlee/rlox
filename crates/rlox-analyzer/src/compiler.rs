@@ -14,6 +14,8 @@ struct Compiler<'a> {
     functions: Vec<FunctionBuilder>,
     function_type: FunctionType,
 
+    /// Compile time heap allocation helps program runs faster at runtime.
+    /// It does increase code complexity, though.
     heap: &'a mut Heap,
 }
 
@@ -356,7 +358,7 @@ impl<'a> Compiler<'a> {
     }
 }
 
-pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Chunk> {
+pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Function> {
     // let chunk = Compiler::new().compile(program)?;
     // #[cfg(feature = "bytecode-preview")]
     // {

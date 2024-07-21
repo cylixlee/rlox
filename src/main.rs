@@ -2,34 +2,34 @@
 #![allow(unused_variables)]
 
 use std::fmt::Display;
-use std::io;
-use std::io::Write;
+use std::mem;
 use std::ops::Deref;
 
 use mimalloc::MiMalloc;
 
 use rlox_analyzer::{compiler, parser, scanner};
 use rlox_intermediate::*;
-use rlox_runtime::VirtualMachine;
 
 #[global_allocator]
 static ALLOCATOR: MiMalloc = MiMalloc;
 
 fn main() {
-    let mut buffer = String::new();
-    loop {
-        print!(">> ");
-        io::stdout().flush().unwrap();
-        io::stdin().read_line(&mut buffer).unwrap();
-        if buffer.trim().is_empty() {
-            break;
-        }
-        let mut source = DiagnosableSource::new("<script>", &buffer);
-        if let Err(diagnostic) = diagnosable_main(&source) {
-            source.diagnose(&diagnostic);
-        }
-        buffer.clear();
-    }
+    println!("Value: {}", mem::size_of::<Value>());
+    println!("DiagnosableResult: {}", mem::size_of::<DiagnosableResult>());
+    // let mut buffer = String::new();
+    // loop {
+    //     print!(">> ");
+    //     io::stdout().flush().unwrap();
+    //     io::stdin().read_line(&mut buffer).unwrap();
+    //     if buffer.trim().is_empty() {
+    //         break;
+    //     }
+    //     let mut source = DiagnosableSource::new("<script>", &buffer);
+    //     if let Err(diagnostic) = diagnosable_main(&source) {
+    //         source.diagnose(&diagnostic);
+    //     }
+    //     buffer.clear();
+    // }
 }
 
 fn diagnosable_main<N, S>(source: &DiagnosableSource<N, S>) -> DiagnosableResult
@@ -39,6 +39,6 @@ where
 {
     let tokens = scanner::scan(source.deref())?;
     let declarations = parser::parse(tokens)?;
-    let chunk = compiler::compile(declarations)?;
-    VirtualMachine::new(chunk).run()
+    let function = compiler::compile(declarations)?;
+    Ok(())
 }
