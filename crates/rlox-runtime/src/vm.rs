@@ -30,7 +30,7 @@ impl VirtualMachine {
         #[cfg(feature = "stack-monitor")]
         println!("━━━━━━━ Stack Monitor ━━━━━━━");
 
-        while self.program_count < self.chunk.len() {
+        loop {
             let instruction = &self.chunk[self.program_count];
             let span = self.chunk.span(self.program_count).clone();
 
@@ -162,6 +162,7 @@ impl VirtualMachine {
                     self.program_count = (self.program_count as isize + offset) as usize;
                     continue;
                 }
+                Instruction::Return => break,
             }
 
             #[cfg(feature = "stack-monitor")]

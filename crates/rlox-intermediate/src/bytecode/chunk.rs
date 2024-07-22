@@ -47,8 +47,11 @@ impl ChunkBuilder {
     }
 
     pub fn append(&mut self, instruction: Instruction) {
-        let span = self.spans.last().unwrap().clone();
-        self.write(instruction, span);
+        if let Some(span) = self.spans.last() {
+            self.write(instruction, span.clone());
+        } else {
+            self.write(instruction, Default::default())
+        }
     }
 
     pub fn define(&mut self, constant: Value) -> usize {

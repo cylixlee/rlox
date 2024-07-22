@@ -2,7 +2,8 @@
 #![allow(unused_variables)]
 
 use std::fmt::Display;
-use std::mem;
+use std::io;
+use std::io::Write;
 use std::ops::Deref;
 
 use mimalloc::MiMalloc;
@@ -14,22 +15,20 @@ use rlox_intermediate::*;
 static ALLOCATOR: MiMalloc = MiMalloc;
 
 fn main() {
-    println!("Value: {}", mem::size_of::<Value>());
-    println!("DiagnosableResult: {}", mem::size_of::<DiagnosableResult>());
-    // let mut buffer = String::new();
-    // loop {
-    //     print!(">> ");
-    //     io::stdout().flush().unwrap();
-    //     io::stdin().read_line(&mut buffer).unwrap();
-    //     if buffer.trim().is_empty() {
-    //         break;
-    //     }
-    //     let mut source = DiagnosableSource::new("<script>", &buffer);
-    //     if let Err(diagnostic) = diagnosable_main(&source) {
-    //         source.diagnose(&diagnostic);
-    //     }
-    //     buffer.clear();
-    // }
+    let mut buffer = String::new();
+    loop {
+        print!(">> ");
+        io::stdout().flush().unwrap();
+        io::stdin().read_line(&mut buffer).unwrap();
+        if buffer.trim().is_empty() {
+            break;
+        }
+        let mut source = DiagnosableSource::new("<script>", &buffer);
+        if let Err(diagnostic) = diagnosable_main(&source) {
+            source.diagnose(&diagnostic);
+        }
+        buffer.clear();
+    }
 }
 
 fn diagnosable_main<N, S>(source: &DiagnosableSource<N, S>) -> DiagnosableResult
@@ -39,6 +38,7 @@ where
 {
     let tokens = scanner::scan(source.deref())?;
     let declarations = parser::parse(tokens)?;
-    let function = compiler::compile(declarations)?;
+    let mut heap = Heap::new();
+    let function = compiler::compile(&mut heap, declarations)?;
     Ok(())
 }

@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::Deref;
@@ -6,7 +6,7 @@ use std::ops::Deref;
 use crate::Function;
 use crate::Reference;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Value {
     Nil,
     Boolean(bool),
@@ -66,6 +66,17 @@ impl Display for Value {
             Value::Number(number) => write!(f, "{number}"),
             Value::String(string) => write!(f, "{}", string.deref()),
             Value::Function(function) => write!(f, "<fun {}>", function.name()),
+        }
+    }
+}
+
+impl Debug for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // Only strings need special treatment when Debug.
+        if let Value::String(string) = self {
+            write!(f, "\"{}\"", string.deref())
+        } else {
+            Display::fmt(self, f)
         }
     }
 }

@@ -35,13 +35,14 @@ impl<'a> Compiler<'a> {
         self.functions.last_mut().unwrap()
     }
 
-    // fn compile(mut self, program: Vec<Declaration>) -> DiagnosableResult<Chunk> {
-    //     while self.offset < program.len() {
-    //         self.compile_declaration(&program[self.offset])?;
-    //         self.offset += 1;
-    //     }
-    //     Ok(self.current_function().build())
-    // }
+    fn compile(mut self, program: Vec<Declaration>) -> DiagnosableResult<Function> {
+        while self.offset < program.len() {
+            self.compile_declaration(&program[self.offset])?;
+            self.offset += 1;
+        }
+        self.current_function().append(Instruction::Return);
+        Ok(self.functions.pop().unwrap().build())
+    }
 
     fn compile_declaration(&mut self, declaration: &Declaration) -> DiagnosableResult {
         match declaration {
@@ -358,20 +359,19 @@ impl<'a> Compiler<'a> {
     }
 }
 
-pub fn compile(program: Vec<Declaration>) -> DiagnosableResult<Function> {
-    // let chunk = Compiler::new().compile(program)?;
-    // #[cfg(feature = "bytecode-preview")]
-    // {
-    //     println!("━━━━━━━ Instructions ━━━━━━━━");
-    //     for (index, instruction) in chunk.iter().enumerate() {
-    //         println!("{index:04} {instruction:?}");
-    //     }
-    //
-    //     println!("━━━━━━━━━ Constants ━━━━━━━━━");
-    //     for (index, constant) in chunk.constants().iter().enumerate() {
-    //         println!("{index:03}  {constant:?}");
-    //     }
-    // }
-    // Ok(chunk)
-    unimplemented!()
+pub fn compile(heap: &mut Heap, program: Vec<Declaration>) -> DiagnosableResult<Function> {
+    let function = Compiler::new(heap).compile(program)?;
+    #[cfg(feature = "bytecode-preview")]
+    {
+        println!("========== INSTR ==========");
+        for (index, instruction) in function.iter().enumerate() {
+            println!("{index:04} {instruction:?}");
+        }
+
+        println!("========== CONST ==========");
+        for (index, value) in function.constants().iter().enumerate() {
+            println!("{index:03}  {value:?}");
+        }
+    }
+    Ok(function)
 }
