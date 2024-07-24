@@ -19,5 +19,5 @@ rlox-runtime = { path = "crates/rlox-runtime" }
 [features]
 default = ["stack-monitor", "bytecode-preview", "gc-sanitizer"]
 stack-monitor = ["rlox-runtime/stack-monitor"]
-bytecode-preview = ["rlox-analyzer/bytecode-preview"]
-gc-sanitizer = ["rlox-runtime/gc-sanitizer"]
+bytecode-preview = ["rlox-analyzer/disassembler"]
+gc-sanitizer = ["rlox-intermediate/gc-sanitizer"]

@@ -100,3 +100,65 @@ impl Deref for Chunk {
         &self.instructions
     }
 }
+
+#[cfg(feature = "disassembler")]
+mod disassembler {
+    use std::fmt::Display;
+
+    use crate::{Chunk, Instruction};
+
+    impl Chunk {
+        pub fn disassemble(&self, title: impl Display) {
+            println!("== {} ==", title);
+            for index in 0..self.instructions.len() {
+                self.disassemble_instruction(index);
+            }
+        }
+
+        pub fn disassemble_instruction(&self, index: usize) {
+            print!("{index:04} ");
+
+            let instruction = &self.instructions[index];
+            match instruction {
+                Instruction::LoadConstant(index) => {
+                    constant_instruction("LoadConstant", self, index);
+                }
+                Instruction::Add => println!("Add"),
+                Instruction::Subtract => println!("Subtract"),
+                Instruction::Multiply => println!("Multiply"),
+                Instruction::Divide => println!("Divide"),
+                Instruction::Negate => println!("Negate"),
+                Instruction::Not => println!("Not"),
+                Instruction::Greater => println!("Greater"),
+                Instruction::Less => println!("Less"),
+                Instruction::Equal => println!("Equal"),
+                Instruction::True => println!("True"),
+                Instruction::False => println!("False"),
+                Instruction::Nil => println!("Nil"),
+                Instruction::Print => println!("Print"),
+                Instruction::Pop => println!("Pop"),
+                Instruction::DefineGlobal => println!("DefineGlobal"),
+                Instruction::GetGlobal => println!("GetGlobal"),
+                Instruction::SetGlobal => println!("SetGlobal"),
+                Instruction::GetLocal(index) => index_instruction("GetLocal", index),
+                Instruction::SetLocal(index) => index_instruction("SetLocal", index),
+                Instruction::JumpIfFalse(offset) => offset_instruction("JumpIfFalse", offset),
+                Instruction::Jump(offset) => offset_instruction("Jump", offset),
+                Instruction::Return => println!("Return"),
+            }
+        }
+    }
+
+    fn constant_instruction(name: impl Display, chunk: &Chunk, index: &usize) {
+        let constant = chunk.constant(*index);
+        println!("{name:<16} {index:4} {constant:?}");
+    }
+
+    fn index_instruction(name: impl Display, index: &usize) {
+        println!("{name:<16} {index:4}");
+    }
+
+    fn offset_instruction(name: impl Display, offset: &isize) {
+        println!("{name:<16} {offset:4}");
+    }
+}

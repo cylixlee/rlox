@@ -65,14 +65,14 @@ impl Display for Value {
             Value::Boolean(boolean) => write!(f, "{boolean}"),
             Value::Number(number) => write!(f, "{number}"),
             Value::String(string) => write!(f, "{}", string.deref()),
-            Value::Function(function) => write!(f, "<fun {}>", function.name()),
+            Value::Function(function) => write!(f, "{:?}", function.deref()),
         }
     }
 }
 
 impl Debug for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // Only strings need special treatment when Debug.
+        // Only string needs special treatment: add quotation marks.
         if let Value::String(string) = self {
             write!(f, "\"{}\"", string.deref())
         } else {

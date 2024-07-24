@@ -9,4 +9,4 @@ smallvec = { version = "1.13.2", features = ["const_generics"] }
 
 [features]
 stack-monitor = []
-gc-sanitizer = []
+

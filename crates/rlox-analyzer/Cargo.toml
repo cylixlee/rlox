@@ -8,4 +8,4 @@ logos = "0.14.0"
 rlox-intermediate = { path = "../rlox-intermediate" }
 
 [features]
-bytecode-preview = []
+disassembler = ["rlox-intermediate/disassembler"]

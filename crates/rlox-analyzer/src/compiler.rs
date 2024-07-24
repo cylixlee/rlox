@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use std::rc::Rc;
 
 use rlox_intermediate::*;
 
@@ -8,6 +9,7 @@ enum FunctionType {
 }
 
 struct Compiler<'a> {
+    program: Vec<Rc<Declaration>>,
     offset: usize,
     locals: Vec<String>,
     blocks: Vec<usize>,
@@ -20,10 +22,11 @@ struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    fn new(heap: &'a mut Heap) -> Self {
+    fn new(heap: &'a mut Heap, program: Vec<Rc<Declaration>>) -> Self {
         Self {
+            program,
             offset: 0,
-            locals: Vec::new(),
+            locals: vec![String::new()],
             blocks: Vec::new(),
             functions: vec![FunctionBuilder::new()],
             function_type: FunctionType::Script,
@@ -35,13 +38,19 @@ impl<'a> Compiler<'a> {
         self.functions.last_mut().unwrap()
     }
 
-    fn compile(mut self, program: Vec<Declaration>) -> DiagnosableResult<Function> {
-        while self.offset < program.len() {
-            self.compile_declaration(&program[self.offset])?;
+    fn compile(&mut self) -> DiagnosableResult<Function> {
+        while self.offset < self.program.len() {
+            self.compile_declaration(&Rc::clone(&self.program[self.offset]))?;
             self.offset += 1;
         }
         self.current_function().append(Instruction::Return);
-        Ok(self.functions.pop().unwrap().build())
+
+        let function = self.functions.pop().unwrap().build();
+
+        #[cfg(feature = "disassembler")]
+        function.disassemble(format!("{function:?}"));
+
+        Ok(function)
     }
 
     fn compile_declaration(&mut self, declaration: &Declaration) -> DiagnosableResult {
@@ -359,19 +368,6 @@ impl<'a> Compiler<'a> {
     }
 }
 
-pub fn compile(heap: &mut Heap, program: Vec<Declaration>) -> DiagnosableResult<Function> {
-    let function = Compiler::new(heap).compile(program)?;
-    #[cfg(feature = "bytecode-preview")]
-    {
-        println!("========== INSTR ==========");
-        for (index, instruction) in function.iter().enumerate() {
-            println!("{index:04} {instruction:?}");
-        }
-
-        println!("========== CONST ==========");
-        for (index, value) in function.constants().iter().enumerate() {
-            println!("{index:03}  {value:?}");
-        }
-    }
-    Ok(function)
+pub fn compile(heap: &mut Heap, program: Vec<Rc<Declaration>>) -> DiagnosableResult<Function> {
+    Ok(Compiler::new(heap, program).compile()?)
 }

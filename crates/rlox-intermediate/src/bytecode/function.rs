@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 use crate::{Chunk, ChunkBuilder};
@@ -65,5 +66,15 @@ impl Deref for Function {
 
     fn deref(&self) -> &Self::Target {
         &self.chunk
+    }
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.name().is_empty() {
+            write!(f, "<script>")
+        } else {
+            write!(f, "<fun {}>", self.name())
+        }
     }
 }

@@ -38,11 +38,7 @@ impl Drop for Heap {
         for allocation in &mut self.allocated {
             #[cfg(feature = "gc-sanitizer")]
             {
-                if let Some(string) = allocation.downcast_ref::<String>() {
-                    println!("-- GC finalize: \"{string}\"");
-                } else {
-                    println!("-- GC finalize: {allocation:?}")
-                }
+                println!("-- GC finalize: {allocation:?}")
             }
             unsafe { allocation.finalize() }
         }

@@ -49,8 +49,9 @@ impl VirtualMachine {
                 (relational $operator: tt) => { binary!(Boolean, $operator) };
             }
 
-            #[cfg(feature = "stack-monitor")]
-            println!("{:04} {:?}", self.program_count, instruction);
+            // TODO: new stack-monitor code here...
+            // #[cfg(feature = "stack-monitor")]
+            // println!("{:04} {:?}", self.program_count, instruction);
 
             match instruction {
                 Instruction::LoadConstant(index) => {
@@ -165,17 +166,14 @@ impl VirtualMachine {
                 Instruction::Return => break,
             }
 
-            #[cfg(feature = "stack-monitor")]
-            if !self.stack.is_empty() {
-                println!("{:?}", self.stack);
-            }
+            // TODO: new stack-monitor code here.
+            // #[cfg(feature = "stack-monitor")]
+            // if !self.stack.is_empty() {
+            //     println!("{:?}", self.stack);
+            // }
 
             self.program_count += 1;
         }
-
-        #[cfg(feature = "stack-monitor")]
-        println!();
-
         Ok(())
     }
 }
