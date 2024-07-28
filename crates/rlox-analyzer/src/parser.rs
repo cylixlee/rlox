@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use rlox_intermediate::*;
 
 use crate::scanner::Token;
@@ -14,11 +12,11 @@ struct Parser {
     current: usize,
 }
 
-pub fn parse(tokens: Vec<Token>) -> DiagnosableResult<Vec<Rc<Declaration>>> {
+pub fn parse(tokens: Vec<Token>) -> DiagnosableResult<Vec<Declaration>> {
     let mut parser = Parser::new(tokens);
     let mut declarations = Vec::new();
     while !parser.has_reached_end() {
-        declarations.push(Rc::new(parser.parse_declaration()?));
+        declarations.push(parser.parse_declaration()?);
     }
     Ok(declarations)
 }

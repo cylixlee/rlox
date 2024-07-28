@@ -10,6 +10,7 @@ use mimalloc::MiMalloc;
 
 use rlox_analyzer::{compiler, parser, scanner};
 use rlox_intermediate::*;
+use rlox_runtime::VirtualMachine;
 
 #[global_allocator]
 static ALLOCATOR: MiMalloc = MiMalloc;
@@ -40,5 +41,5 @@ where
     let declarations = parser::parse(tokens)?;
     let mut heap = Heap::new();
     let function = compiler::compile(&mut heap, declarations)?;
-    Ok(())
+    VirtualMachine::new(heap, function).run()
 }

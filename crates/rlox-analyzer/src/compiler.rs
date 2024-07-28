@@ -1,5 +1,4 @@
 use std::ops::Deref;
-use std::rc::Rc;
 
 use rlox_intermediate::*;
 
@@ -8,11 +7,15 @@ enum FunctionType {
     Script,
 }
 
+struct Local {
+    name: String,
+    depth: usize,
+}
+
 struct Compiler<'a> {
-    program: Vec<Rc<Declaration>>,
     offset: usize,
-    locals: Vec<String>,
-    blocks: Vec<usize>,
+    locals: Vec<Local>,
+    depth: usize,
     functions: Vec<FunctionBuilder>,
     function_type: FunctionType,
 
@@ -22,12 +25,11 @@ struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    fn new(heap: &'a mut Heap, program: Vec<Rc<Declaration>>) -> Self {
+    fn new(heap: &'a mut Heap) -> Self {
         Self {
-            program,
             offset: 0,
-            locals: vec![String::new()],
-            blocks: Vec::new(),
+            locals: Vec::new(),
+            depth: 0,
             functions: vec![FunctionBuilder::new()],
             function_type: FunctionType::Script,
             heap,
@@ -38,19 +40,13 @@ impl<'a> Compiler<'a> {
         self.functions.last_mut().unwrap()
     }
 
-    fn compile(&mut self) -> DiagnosableResult<Function> {
-        while self.offset < self.program.len() {
-            self.compile_declaration(&Rc::clone(&self.program[self.offset]))?;
+    fn compile(&mut self, program: Vec<Declaration>) -> DiagnosableResult<Function> {
+        while self.offset < program.len() {
+            self.compile_declaration(&program[self.offset])?;
             self.offset += 1;
         }
         self.current_function().append(Instruction::Return);
-
-        let function = self.functions.pop().unwrap().build();
-
-        #[cfg(feature = "disassembler")]
-        function.disassemble(format!("{function:?}"));
-
-        Ok(function)
+        Ok(self.functions.pop().unwrap().build())
     }
 
     fn compile_declaration(&mut self, declaration: &Declaration) -> DiagnosableResult {
@@ -64,7 +60,7 @@ impl<'a> Compiler<'a> {
                         .write(Instruction::Nil, name.span.clone());
                 }
                 // determine whether it is global or local
-                if self.blocks.is_empty() {
+                if self.depth == 0 {
                     // load global variable name (identifier)
                     let identifier = self.heap.spawn_string(name.deref().clone());
                     let index = self.current_function().define(Value::String(identifier));
@@ -74,7 +70,10 @@ impl<'a> Compiler<'a> {
                 } else {
                     // there's no need to generate SetLocal.
                     // local variables are defined once initializer expression calculated.
-                    self.locals.push(name.deref().clone());
+                    self.locals.push(Local {
+                        name: name.deref().clone(),
+                        depth: self.depth,
+                    });
                 }
             }
             Declaration::Statement(statement) => self.compile_statement(statement)?,
@@ -346,8 +345,8 @@ impl<'a> Compiler<'a> {
 
     fn search_local(&self, identifier: &String) -> Option<usize> {
         let mut local_index = None;
-        for (index, name) in self.locals.iter().rev().enumerate() {
-            if name == identifier {
+        for (index, local) in self.locals.iter().enumerate().rev() {
+            if &local.name == identifier {
                 local_index = Some(self.locals.len() - index - 1);
                 break;
             }
@@ -356,18 +355,23 @@ impl<'a> Compiler<'a> {
     }
 
     fn begin_scope(&mut self) {
-        self.blocks.push(self.locals.len());
+        self.depth += 1;
     }
 
     fn end_scope(&mut self) {
-        let frame = self.blocks.pop().unwrap();
-        while self.locals.len() > frame {
+        self.depth -= 1;
+        while self.locals.len() > self.depth {
             self.locals.pop();
             self.current_function().append(Instruction::Pop);
         }
     }
 }
 
-pub fn compile(heap: &mut Heap, program: Vec<Rc<Declaration>>) -> DiagnosableResult<Function> {
-    Ok(Compiler::new(heap, program).compile()?)
+pub fn compile(heap: &mut Heap, program: Vec<Declaration>) -> DiagnosableResult<Function> {
+    let function = Compiler::new(heap).compile(program)?;
+    #[cfg(feature = "disassembler")]
+    {
+        function.disassemble(function.name());
+    }
+    Ok(function)
 }

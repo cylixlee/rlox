@@ -109,7 +109,7 @@ mod disassembler {
 
     impl Chunk {
         pub fn disassemble(&self, title: impl Display) {
-            println!("== {} ==", title);
+            println!("━━━━━ {} ━━━━━", title);
             for index in 0..self.instructions.len() {
                 self.disassemble_instruction(index);
             }
@@ -144,6 +144,9 @@ mod disassembler {
                 Instruction::SetLocal(index) => index_instruction("SetLocal", index),
                 Instruction::JumpIfFalse(offset) => offset_instruction("JumpIfFalse", offset),
                 Instruction::Jump(offset) => offset_instruction("Jump", offset),
+                Instruction::Call(_argument_count) => {
+                    unimplemented!()
+                }
                 Instruction::Return => println!("Return"),
             }
         }
@@ -151,7 +154,7 @@ mod disassembler {
 
     fn constant_instruction(name: impl Display, chunk: &Chunk, index: &usize) {
         let constant = chunk.constant(*index);
-        println!("{name:<16} {index:4} {constant:?}");
+        println!("{name:<16} {index:4}    <{constant:?}>");
     }
 
     fn index_instruction(name: impl Display, index: &usize) {

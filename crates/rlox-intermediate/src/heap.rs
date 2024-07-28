@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::Reference;
+use crate::{Function, Reference};
 
 pub struct Heap {
     allocated: Vec<Reference<()>>,
@@ -38,7 +38,13 @@ impl Drop for Heap {
         for allocation in &mut self.allocated {
             #[cfg(feature = "gc-sanitizer")]
             {
-                println!("-- GC finalize: {allocation:?}")
+                if let Some(string) = allocation.downcast_ref::<String>() {
+                    println!("-- GC finalize: \"{string}\"")
+                } else if let Some(function) = allocation.downcast_ref::<Function>() {
+                    println!("-- GC finalize: {function:?}")
+                } else {
+                    println!("-- GC finalize: {allocation:?}")
+                }
             }
             unsafe { allocation.finalize() }
         }

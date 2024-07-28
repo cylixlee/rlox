@@ -1,38 +1,52 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 
 use rlox_intermediate::*;
 
-const STACK_SIZE: usize = 4 * 1024;
+const FRAMES_CAPACITY: usize = 128;
+const STACK_CAPACITY: usize = 1024;
+
+struct CallFrame {
+    function: Reference<Function>,
+    program_count: usize,
+    offset: usize,
+}
 
 pub struct VirtualMachine {
-    chunk: Chunk,
     program_count: usize,
-    stack: SmallVec<[Value; STACK_SIZE]>,
+    stack: SmallVec<[Value; STACK_CAPACITY]>,
     heap: Heap,
     globals: HashMap<String, Value>,
+    call_stack: SmallVec<[CallFrame; FRAMES_CAPACITY]>,
 }
 
 impl VirtualMachine {
-    pub fn new(chunk: Chunk) -> Self {
+    pub fn new(mut heap: Heap, function: Function) -> Self {
+        let function = heap.spawn(function);
         Self {
-            chunk,
             program_count: 0,
             stack: SmallVec::new(),
-            heap: Heap::new(),
+            heap,
             globals: HashMap::new(),
+            call_stack: smallvec![CallFrame {
+                function,
+                program_count: 0,
+                offset: 0,
+            }],
         }
     }
 
     pub fn run(&mut self) -> DiagnosableResult {
         #[cfg(feature = "stack-monitor")]
-        println!("━━━━━━━ Stack Monitor ━━━━━━━");
+        {
+            println!("━━━━━ Stack Monitor ━━━━━");
+        }
 
         loop {
-            let instruction = &self.chunk[self.program_count];
-            let span = self.chunk.span(self.program_count).clone();
+            let instruction = &self.frame_function()[self.program_count];
+            let span = self.frame_function().span(self.program_count).clone();
 
             macro_rules! binary {
                 ($variant: ident, $operator: tt) => {{
@@ -51,11 +65,11 @@ impl VirtualMachine {
 
             // TODO: new stack-monitor code here...
             // #[cfg(feature = "stack-monitor")]
-            // println!("{:04} {:?}", self.program_count, instruction);
+            // { println!("{:04} {:?}", self.program_count, instruction); }
 
             match instruction {
                 Instruction::LoadConstant(index) => {
-                    let value = self.chunk.constant(*index).clone();
+                    let value = self.frame_function().constant(*index).clone();
                     match value {
                         Value::String(string) => {
                             let reference = self.heap.spawn_string(string.deref().clone());
@@ -147,10 +161,14 @@ impl VirtualMachine {
                         raise!("E0012", span);
                     }
                 }
-                Instruction::GetLocal(index) => self.stack.push(self.stack[*index].clone()),
+                Instruction::GetLocal(index) => {
+                    let offset = self.frame_offset();
+                    self.stack.push(self.stack[offset + *index].clone());
+                }
                 Instruction::SetLocal(index) => {
                     let value = self.stack.last().unwrap().clone();
-                    self.stack[*index] = value;
+                    let offset = self.frame_offset();
+                    self.stack[offset + *index] = value;
                 }
                 Instruction::JumpIfFalse(offset) => {
                     let condition: bool = self.stack.last().unwrap().boolean();
@@ -163,6 +181,7 @@ impl VirtualMachine {
                     self.program_count = (self.program_count as isize + offset) as usize;
                     continue;
                 }
+                Instruction::Call(argument_count) => {}
                 Instruction::Return => break,
             }
 
@@ -175,5 +194,13 @@ impl VirtualMachine {
             self.program_count += 1;
         }
         Ok(())
+    }
+
+    fn frame_function(&self) -> Reference<Function> {
+        self.call_stack.last().unwrap().function.clone()
+    }
+
+    fn frame_offset(&self) -> usize {
+        self.call_stack.last().unwrap().offset
     }
 }
