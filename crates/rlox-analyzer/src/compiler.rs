@@ -344,14 +344,12 @@ impl<'a> Compiler<'a> {
     }
 
     fn search_local(&self, identifier: &String) -> Option<usize> {
-        let mut local_index = None;
         for (index, local) in self.locals.iter().enumerate().rev() {
             if &local.name == identifier {
-                local_index = Some(self.locals.len() - index - 1);
-                break;
+                return Some(self.locals.len() - index - 1);
             }
         }
-        local_index
+        None
     }
 
     fn begin_scope(&mut self) {

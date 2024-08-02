@@ -181,7 +181,7 @@ impl VirtualMachine {
                     self.program_count = (self.program_count as isize + offset) as usize;
                     continue;
                 }
-                Instruction::Call(argument_count) => {}
+                Instruction::Call(_) => todo!(),
                 Instruction::Return => break,
             }
 
