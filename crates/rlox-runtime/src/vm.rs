@@ -6,7 +6,7 @@ use smallvec::{smallvec, SmallVec};
 use rlox_intermediate::*;
 
 const FRAMES_CAPACITY: usize = 128;
-const STACK_CAPACITY: usize = 1024;
+const STACK_CAPACITY: usize = 8192;
 
 struct CallFrame {
     function: Reference<Function>,
@@ -45,8 +45,8 @@ impl VirtualMachine {
         }
 
         loop {
-            let instruction = &self.frame_function()[self.program_count];
-            let span = self.frame_function().span(self.program_count).clone();
+            let instruction = &self.current_function()[self.program_count];
+            let span = self.current_function().span(self.program_count).clone();
 
             macro_rules! binary {
                 ($variant: ident, $operator: tt) => {{
@@ -63,13 +63,13 @@ impl VirtualMachine {
                 (relational $operator: tt) => { binary!(Boolean, $operator) };
             }
 
-            // TODO: new stack-monitor code here...
-            // #[cfg(feature = "stack-monitor")]
-            // { println!("{:04} {:?}", self.program_count, instruction); }
+            #[cfg(feature = "stack-monitor")]
+            self.current_function()
+                .disassemble_instruction(self.program_count);
 
             match instruction {
                 Instruction::LoadConstant(index) => {
-                    let value = self.frame_function().constant(*index).clone();
+                    let value = self.current_function().constant(*index).clone();
                     match value {
                         Value::String(string) => {
                             let reference = self.heap.spawn_string(string.deref().clone());
@@ -162,12 +162,12 @@ impl VirtualMachine {
                     }
                 }
                 Instruction::GetLocal(index) => {
-                    let offset = self.frame_offset();
+                    let offset = self.current_stack_offset();
                     self.stack.push(self.stack[offset + *index].clone());
                 }
                 Instruction::SetLocal(index) => {
                     let value = self.stack.last().unwrap().clone();
-                    let offset = self.frame_offset();
+                    let offset = self.current_stack_offset();
                     self.stack[offset + *index] = value;
                 }
                 Instruction::JumpIfFalse(offset) => {
@@ -185,22 +185,31 @@ impl VirtualMachine {
                 Instruction::Return => break,
             }
 
-            // TODO: new stack-monitor code here.
-            // #[cfg(feature = "stack-monitor")]
-            // if !self.stack.is_empty() {
-            //     println!("{:?}", self.stack);
-            // }
+            #[cfg(feature = "stack-monitor")]
+            if !self.stack.is_empty() {
+                stack_monitor(&self.stack);
+            }
 
             self.program_count += 1;
         }
         Ok(())
     }
 
-    fn frame_function(&self) -> Reference<Function> {
+    fn current_function(&self) -> Reference<Function> {
         self.call_stack.last().unwrap().function.clone()
     }
 
-    fn frame_offset(&self) -> usize {
+    fn current_stack_offset(&self) -> usize {
         self.call_stack.last().unwrap().offset
     }
+}
+
+fn stack_monitor<T>(stack: &SmallVec<T>)
+where
+    T: smallvec::Array<Item = Value>,
+{
+    for value in stack {
+        print!("[ {value:?} ]");
+    }
+    println!();
 }
